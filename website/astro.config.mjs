@@ -4,8 +4,7 @@ import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  site: 'https://ferrislabs.github.io',
-  base: process.argv.includes('build') ? '/ferrisletter' : '/',
+  site: 'https://site.ferrisletter.xyz',
   output: 'static',
   integrations: [react()],
   vite: {
