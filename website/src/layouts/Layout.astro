@@ -1,0 +1,39 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = 'Ferrisletter — Newsletters that talk back',
+  description = 'A conversational newsletter platform powered by MCP. Built in Rust. Open source.',
+} = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <div class="fixed inset-0 pointer-events-none z-0" style="background-image: linear-gradient(rgba(109,90,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(109,90,255,0.03) 1px, transparent 1px); background-size: 64px 64px;"></div>
+    <slot />
+  </body>
+</html>

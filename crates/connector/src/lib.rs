@@ -23,10 +23,18 @@ pub trait Connector: Send + Sync {
     async fn get_item_detail(&self, id: &str) -> Result<ItemDetail, ConnectorError>;
 
     /// Finds items matching a query across all past content.
-    async fn search(&self, query: &str, filters: &SearchFilters) -> Result<Vec<Item>, ConnectorError>;
+    async fn search(
+        &self,
+        query: &str,
+        filters: &SearchFilters,
+    ) -> Result<Vec<Item>, ConnectorError>;
 
     /// Returns a summary of items since a given point in time.
-    async fn get_recap(&self, since: DateTime<Utc>, prefs: &UserPrefs) -> Result<Vec<Item>, ConnectorError>;
+    async fn get_recap(
+        &self,
+        since: DateTime<Utc>,
+        prefs: &UserPrefs,
+    ) -> Result<Vec<Item>, ConnectorError>;
 }
 
 /// A content category within a newsletter.

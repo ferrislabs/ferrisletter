@@ -1,0 +1,22 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav';
+import Hero from '../components/Hero';
+import ChatDemo from '../components/ChatDemo';
+import HowItsDifferent from '../components/HowItsDifferent';
+import Features from '../components/Features';
+import Architecture from '../components/Architecture';
+import TechStack from '../components/TechStack';
+import CTA from '../components/CTA';
+---
+
+<Layout>
+  <Nav client:load />
+  <Hero client:load />
+  <ChatDemo client:visible />
+  <HowItsDifferent client:visible />
+  <Features client:visible />
+  <Architecture client:visible />
+  <TechStack client:visible />
+  <CTA client:visible />
+</Layout>
