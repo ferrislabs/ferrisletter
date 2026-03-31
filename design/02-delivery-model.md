@@ -1,0 +1,173 @@
+# Delivery Model — Scheduled Pull via Client Tasks
+
+## The Key Insight
+
+MCP clients (ChatGPT, Claude) have native scheduled task systems. We don't need to build push infrastructure — we leverage the client's scheduler.
+
+The MCP server doesn't push. The client pulls on a schedule. From the user's perspective, the newsletter "just shows up."
+
+---
+
+## Subscriber Flow
+
+### First-Time Setup (one conversation)
+
+```
+Subscriber: "I want to subscribe to the AI Digest newsletter"
+AI Letter:  [renders newsletter preview card — topics, frequency, sample]
+            "Subscribed! How would you like to receive it?"
+
+Subscriber: "Every Monday morning, just show me the highlights"
+AI Letter:  "Done. I'll check for new issues every Monday at 9am
+             and show you a summary. You can expand any topic."
+```
+
+Behind the scenes:
+- The MCP server registers the subscription (backend API)
+- The LLM client creates a scheduled task: "Every Monday 9am, call
+  `ai_letter_check_new_issues` and present results"
+- The subscriber's preferences (brief summaries, topics of interest)
+  are stored server-side
+
+### Weekly Delivery (automatic, zero effort)
+
+Every Monday at 9am, the client's scheduler fires:
+
+```
+[Scheduled Task runs]
+
+AI Letter:  "New issue of AI Digest — Week 14"
+            [renders compact card UI]
+            ┌──────────────────────────────────────┐
+            │  AI Digest #14 — March 30, 2026      │
+            │                                      │
+            │  Research: Mamba-3 matches GPT-5      │
+            │  on reasoning benchmarks              │
+            │                                      │
+            │  Industry: Two major acquisitions     │
+            │  reshape the AI chip market           │
+            │                                      │
+            │  Open Source: LLaMA 4 goes Apache 2.0 │
+            │                                      │
+            │  Opinion: Why prompt engineering      │
+            │  is already dead                      │
+            │                                      │
+            │  [Expand All]  [Mark as Read]         │
+            └──────────────────────────────────────┘
+```
+
+The subscriber can then:
+- Tap/click to expand any topic
+- Say "tell me more about Mamba-3"
+- Say "skip, show me next week"
+- Do nothing (it's just there when they open chat)
+
+### Catch-Up Flow (on demand)
+
+```
+Subscriber: "I haven't checked AI Digest in 2 weeks, what did I miss?"
+AI Letter:  [renders recap view — last 2 issues, highlights only]
+            "Here's what you missed across issues #13 and #14.
+             Want me to go deeper on anything?"
+```
+
+---
+
+## How Scheduling Works Per Client
+
+### ChatGPT
+- Native "Scheduled Tasks" feature
+- User or the model can create them
+- Runs in background, results appear in chat
+- Can call MCP tools during execution
+
+### Claude (Desktop / Code)
+- Scheduled tasks run locally
+- Full MCP server access during execution
+- Results appear as a new conversation or notification
+
+### Other MCP Clients
+- Clients without scheduling: subscriber manually asks "any new issues?"
+- The MCP server exposes a `check_new_issues` tool that works
+  regardless of whether it's called manually or by a scheduler
+- Graceful degradation: works everywhere, magical where scheduling exists
+
+---
+
+## What the MCP Server Needs to Support This
+
+### Tool: `check_new_issues`
+
+```
+Input:
+  - subscriber_id (from auth)
+  - since: optional timestamp (default: last check)
+
+Output:
+  - list of new issues since last check
+  - each issue in compact format (per subscriber preferences)
+  - UI resource for rendering
+
+Behavior:
+  - Returns empty if no new issues
+  - Respects subscriber's topic filters
+  - Formats according to subscriber's length preference
+  - Updates "last seen" timestamp
+```
+
+### Tool: `setup_delivery`
+
+```
+Input:
+  - newsletter_id
+  - frequency: "daily" | "weekly" | "biweekly" | "manual"
+  - preferred_day: optional (e.g., "monday")
+  - preferred_time: optional (e.g., "09:00")
+  - summary_style: "headlines" | "brief" | "detailed"
+
+Output:
+  - Confirmation message
+  - Suggested prompt for the client's scheduler
+  - (The MCP server CANNOT create the scheduled task itself —
+     it returns instructions that the LLM uses to set it up)
+```
+
+This is important: the MCP server tells the LLM "here's what to schedule" and the LLM uses the client's native scheduler. The server doesn't touch the scheduler directly.
+
+---
+
+## Architecture Implications
+
+### What changes from the previous design:
+
+1. **The MCP server needs a `last_seen` per subscriber** — to know what's "new"
+2. **Subscriber preferences drive rendering** — the same issue looks different
+   for each subscriber based on their settings
+3. **The server must handle "catch-up" queries** — "what did I miss since X"
+   requires temporal awareness
+4. **Compact rendering is the default** — the first render is always brief,
+   expansion is always on demand
+5. **The scheduled task prompt is generated by the server** — it crafts the
+   exact instruction the LLM should schedule
+
+### What stays the same:
+
+- Backend stores everything (subscriptions, preferences, content)
+- MCP UI renders the newsletter views
+- Publisher flow unchanged
+
+---
+
+## Open Questions
+
+1. **What happens if the client doesn't support scheduling?**
+   Fallback: the subscriber just asks manually. The tool works the same way.
+
+2. **Can the LLM reliably set up a scheduled task from a tool's suggestion?**
+   Needs testing. If not, we provide explicit instructions to the user.
+
+3. **Rate limiting?** If 1000 subscribers all poll at 9am Monday, the backend
+   needs to handle that. Caching layer needed.
+
+4. **Notification vs conversation?** Does the scheduled task result appear as
+   a notification badge or a full conversation? Client-dependent.

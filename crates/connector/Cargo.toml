@@ -1,0 +1,13 @@
+[package]
+name = "ferrisletter-connector"
+description = "Connector trait and types for Ferrisletter content sources"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+thiserror = "2"

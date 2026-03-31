@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/server",
+    "crates/connector",
+    "crates/connector-rss",
+    "crates/connector-static",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/ferrislabs/ferrisletter"

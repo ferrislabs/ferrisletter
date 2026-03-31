@@ -1,0 +1,16 @@
+[package]
+name = "ferrisletter-server"
+description = "MCP server for Ferrisletter conversational newsletters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+ferrisletter-connector = { path = "../connector" }
+rmcp = { version = "0.1", features = ["server", "transport-sse"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
