@@ -75,7 +75,7 @@ export default function ChatDemo() {
   };
 
   return (
-    <section id="how-it-works" className="py-28 relative z-1" ref={sectionRef}>
+    <section id="how-it-works" className="py-28 relative z-[1]" ref={sectionRef}>
       <div className="max-w-[1200px] mx-auto px-8">
         <div className="text-center mb-16">
           <span className="inline-block font-mono text-xs font-medium text-[var(--color-accent)] uppercase tracking-widest mb-4">
@@ -83,7 +83,7 @@ export default function ChatDemo() {
           </span>
           <h2 className="text-[clamp(2rem,5vw,3.2rem)] font-extrabold tracking-tight leading-tight mb-4">
             Your newsletter is a{' '}
-            <span className="bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-secondary)] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-secondary)] bg-clip-text text-transparent inline">
               conversation
             </span>
           </h2>

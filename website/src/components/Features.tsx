@@ -21,7 +21,7 @@ export default function Features() {
   }, []);
 
   return (
-    <section id="features" className="py-28 relative z-1" ref={ref}>
+    <section id="features" className="py-28 relative z-[1]" ref={ref}>
       <div className="max-w-[1200px] mx-auto px-8">
         <div className="text-center mb-16">
           <span className="inline-block font-mono text-xs font-medium text-[var(--color-accent)] uppercase tracking-widest mb-4">Features</span>

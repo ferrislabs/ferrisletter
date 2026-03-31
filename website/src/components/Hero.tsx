@@ -9,7 +9,9 @@ export default function Hero() {
   }, []);
 
   return (
-    <section className="min-h-screen flex items-center justify-center text-center pt-32 pb-16 relative overflow-hidden">
+    <section className="min-h-screen flex items-center justify-center text-center pt-32 pb-16 relative overflow-hidden z-[1]">
+      <div className="absolute w-[600px] h-[600px] -top-[200px] left-1/2 -translate-x-1/2 rounded-full bg-[var(--color-accent)] opacity-[0.08] blur-[120px] pointer-events-none" />
+      <div className="absolute w-[400px] h-[400px] bottom-[10%] right-[10%] rounded-full bg-[var(--color-accent-secondary)] opacity-[0.05] blur-[120px] pointer-events-none" />
       <div
         className={`max-w-[1200px] mx-auto px-8 transition-all duration-800 ease-out ${
           visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'

@@ -18,7 +18,7 @@ export default function Architecture() {
   }, []);
 
   return (
-    <section className="py-28 relative z-1" ref={ref}>
+    <section className="py-28 relative z-[1]" ref={ref}>
       <div className="max-w-[800px] mx-auto px-8">
         <div className="text-center mb-16">
           <span className="inline-block font-mono text-xs font-medium text-[var(--color-accent)] uppercase tracking-widest mb-4">How it connects</span>
@@ -54,7 +54,7 @@ export default function Architecture() {
               </div>
               {i < steps.length - 1 && (
                 <div
-                  className={`flex flex-col md:flex-row items-center gap-1 px-3 py-2 md:py-0 transition-all duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}
+                  className={`flex flex-col items-center gap-1.5 px-3 py-2 md:py-0 transition-all duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}
                   style={{ transitionDelay: `${i * 150 + 100}ms` }}
                 >
                   <div className="w-0.5 h-8 md:w-12 md:h-0.5 bg-[var(--color-border)] rounded relative overflow-hidden">

@@ -13,7 +13,8 @@ export default function CTA() {
 
   return (
     <>
-      <section className="py-28 pb-24 relative z-1" ref={ref}>
+      <section className="py-28 pb-24 relative z-[1]" ref={ref}>
+        <div className="absolute w-[500px] h-[500px] bottom-0 left-1/2 -translate-x-1/2 rounded-full bg-[var(--color-accent)] opacity-[0.06] blur-[120px] pointer-events-none" />
         <div
           className={`max-w-[800px] mx-auto px-8 transition-all duration-700 ease-out ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
         >
@@ -42,7 +43,7 @@ export default function CTA() {
         </div>
       </section>
 
-      <footer className="py-8 border-t border-[var(--color-border)] relative z-1">
+      <footer className="py-8 border-t border-[var(--color-border)] relative z-[1]">
         <div className="max-w-[1200px] mx-auto px-8 flex items-center justify-between max-sm:flex-col max-sm:gap-3 max-sm:text-center">
           <div className="flex items-center gap-2 font-bold text-base">
             <span className="text-[var(--color-accent)]">&#9671;</span>

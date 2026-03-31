@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   site: 'https://ferrislabs.github.io',
-  base: '/ferrisletter',
+  base: process.argv.includes('build') ? '/ferrisletter' : '/',
   output: 'static',
   integrations: [react()],
   vite: {
