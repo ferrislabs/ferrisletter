@@ -1,0 +1,77 @@
+# ferrisletter-demo.toml — ready-to-run demo for Claude Desktop
+#
+# Setup (one command):
+#   ./scripts/setup-claude-desktop.sh
+#
+# Or manually:
+#   1. cargo build --release
+#   2. Add to ~/Library/Application Support/Claude/claude_desktop_config.json:
+#
+#   {
+#     "mcpServers": {
+#       "ferrisletter": {
+#         "command": "/path/to/ferrisletter-server",
+#         "args": ["--config", "/path/to/ferrisletter-demo.toml"]
+#       }
+#     }
+#   }
+#
+# Then restart Claude Desktop and ask:
+#   "What's new in AI this week?"
+#   "Catch me up on Rust since last Monday"
+#   "Find anything about agents or MCP"
+
+# --------------------------------------------------------------------------
+# Transport — stdio is the right mode for Claude Desktop / Cursor / Zed
+# --------------------------------------------------------------------------
+
+[transport]
+mode = "stdio"
+
+# --------------------------------------------------------------------------
+# Topics & feeds
+# --------------------------------------------------------------------------
+
+[connector]
+type = "rss"
+
+# AI & LLMs ----------------------------------------------------------------
+
+[[connector.feeds]]
+topic_id          = "ai"
+topic_label       = "AI & LLMs"
+topic_description = "Large language models, agents, and the AI ecosystem"
+topic_tags        = ["ai", "llm", "agents", "ml"]
+url               = "https://simonwillison.net/atom/everything/"
+
+[[connector.feeds]]
+topic_id          = "ai"
+topic_label       = "AI & LLMs"
+topic_description = "Large language models, agents, and the AI ecosystem"
+topic_tags        = ["ai", "llm", "agents", "ml"]
+url               = "https://hnrss.org/newest?q=llm+OR+claude+OR+openai&points=50"
+
+# Rust ---------------------------------------------------------------------
+
+[[connector.feeds]]
+topic_id          = "rust"
+topic_label       = "Rust"
+topic_description = "Official announcements, releases, and news from the Rust ecosystem"
+topic_tags        = ["rust", "programming", "systems"]
+url               = "https://blog.rust-lang.org/feed.xml"
+
+[[connector.feeds]]
+topic_id          = "rust"
+topic_label       = "Rust"
+topic_description = "Official announcements, releases, and news from the Rust ecosystem"
+topic_tags        = ["rust", "programming", "community"]
+url               = "https://this-week-in-rust.org/atom.xml"
+
+# Open Source & Dev --------------------------------------------------------
+
+[[connector.feeds]]
+topic_id          = "open-source"
+topic_label       = "Open Source"
+topic_description = "Open-source projects, releases, and developer news"
+topic_tags        = ["open-source", "github", "dev"]
+url               = "https://github.blog/feed/"
