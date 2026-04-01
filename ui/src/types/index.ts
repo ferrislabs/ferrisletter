@@ -26,4 +26,5 @@ export interface McpState {
   topics: Topic[];
   items: Item[];
   error?: string;
+  refreshing?: boolean;
 }

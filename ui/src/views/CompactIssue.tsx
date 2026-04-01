@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { ChevronDown, ExternalLink, Clock, Loader2 } from "lucide-react";
+import { ChevronDown, ExternalLink, Clock, Loader2, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate } from "@/lib/utils";
 import { getItemDetail } from "@/lib/mcp";
@@ -51,7 +51,6 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
           )}
           aria-expanded={open}
         >
-          {/* expand indicator */}
           <ChevronDown
             size={14}
             className={cn(
@@ -66,7 +65,7 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
               {item.headline}
             </p>
             <div className="mt-1 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-[var(--color-text-dim)]">
+              <span className="text-xs text-[var(--color-text-dim)] truncate max-w-[160px]">
                 {item.source}
               </span>
               <span className="text-[var(--color-border-hover)]">·</span>
@@ -100,7 +99,6 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
                 {body}
               </p>
 
-              {/* tags */}
               {item.tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {item.tags.map((tag) => (
@@ -111,7 +109,6 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
                 </div>
               )}
 
-              {/* links */}
               {links.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {links.map((link) => (
@@ -149,7 +146,6 @@ function TopicSection({ topic, items, isDemo }: TopicSectionProps) {
 
   return (
     <section aria-labelledby={`topic-${topic.id}`}>
-      {/* topic header */}
       <div className="flex items-center gap-2 px-4 py-2 sticky top-0 bg-[var(--color-bg-card)] z-10 border-b border-[var(--color-border)]">
         <Badge variant="topic">{topic.label}</Badge>
         <span className="text-xs text-[var(--color-text-dim)]">
@@ -165,6 +161,48 @@ function TopicSection({ topic, items, isDemo }: TopicSectionProps) {
         ))}
       </ul>
     </section>
+  );
+}
+
+// ── Topic filter tabs ─────────────────────────────────────────────────────────
+
+interface TopicFilterProps {
+  topics: Topic[];
+  active: string | null;
+  onChange: (id: string | null) => void;
+}
+
+function TopicFilter({ topics, active, onChange }: TopicFilterProps) {
+  if (topics.length <= 1) return null;
+
+  return (
+    <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-[var(--color-border)] overflow-x-auto shrink-0">
+      <button
+        onClick={() => onChange(null)}
+        className={cn(
+          "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+          active === null
+            ? "bg-[var(--color-accent)] text-white"
+            : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-elevated)]",
+        )}
+      >
+        All
+      </button>
+      {topics.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onChange(active === t.id ? null : t.id)}
+          className={cn(
+            "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+            active === t.id
+              ? "bg-[var(--color-accent)] text-white"
+              : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-elevated)]",
+          )}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -188,11 +226,27 @@ interface CompactIssueProps {
   topics: Topic[];
   items: Item[];
   isDemo: boolean;
+  isRefreshing: boolean;
+  onRefresh: () => void;
 }
 
-export function CompactIssue({ topics, items, isDemo }: CompactIssueProps) {
+export function CompactIssue({
+  topics,
+  items,
+  isDemo,
+  isRefreshing,
+  onRefresh,
+}: CompactIssueProps) {
+  const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
+
+  const visibleTopics =
+    activeTopicId ? topics.filter((t) => t.id === activeTopicId) : topics;
+
   const byTopic = (topicId: string) =>
     items.filter((i) => i.topic_id === topicId);
+
+  const visibleItems =
+    activeTopicId ? items.filter((i) => i.topic_id === activeTopicId) : items;
 
   const latestDate =
     items.length > 0
@@ -215,16 +269,44 @@ export function CompactIssue({ topics, items, isDemo }: CompactIssueProps) {
             <p className="text-xs text-[var(--color-text-dim)]">{latestDate}</p>
           )}
         </div>
-        <Badge variant="muted">
-          {items.length} {items.length === 1 ? "item" : "items"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="muted">
+            {visibleItems.length}{" "}
+            {visibleItems.length === 1 ? "item" : "items"}
+          </Badge>
+          {!isDemo && (
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              aria-label="Refresh"
+              className={cn(
+                "p-1.5 rounded-md text-[var(--color-text-dim)] transition-colors",
+                "hover:text-[var(--color-text)] hover:bg-[var(--color-bg-elevated)]",
+                "disabled:opacity-40 disabled:cursor-not-allowed",
+              )}
+            >
+              <RotateCw
+                size={13}
+                className={isRefreshing ? "animate-spin" : ""}
+                aria-hidden
+              />
+            </button>
+          )}
+        </div>
       </header>
+
+      {/* topic filter */}
+      <TopicFilter
+        topics={topics}
+        active={activeTopicId}
+        onChange={setActiveTopicId}
+      />
 
       {/* scrollable content */}
       <div className="flex-1 overflow-y-auto">
         {isDemo && <DemoBanner />}
 
-        {topics.map((topic) => (
+        {visibleTopics.map((topic) => (
           <TopicSection
             key={topic.id}
             topic={topic}
@@ -233,7 +315,7 @@ export function CompactIssue({ topics, items, isDemo }: CompactIssueProps) {
           />
         ))}
 
-        {items.length === 0 && (
+        {visibleItems.length === 0 && (
           <div className="flex items-center justify-center h-32 text-sm text-[var(--color-text-dim)]">
             No items yet.
           </div>

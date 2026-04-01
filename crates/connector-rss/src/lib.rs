@@ -125,9 +125,11 @@ impl RssConnector {
 
 impl Connector for RssConnector {
     async fn list_topics(&self) -> Result<Vec<Topic>, ConnectorError> {
+        let mut seen = std::collections::HashSet::new();
         Ok(self
             .feeds
             .iter()
+            .filter(|f| seen.insert(f.topic_id.clone()))
             .map(|f| Topic {
                 id: f.topic_id.clone(),
                 label: f.topic_label.clone(),
