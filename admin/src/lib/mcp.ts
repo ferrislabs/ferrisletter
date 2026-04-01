@@ -4,12 +4,27 @@ import type { Item, ItemDetail, Topic } from "@/types";
 
 let _client: Client | null = null;
 
+/**
+ * Resolve the SSE URL to connect to.
+ *
+ * In dev mode (Vite dev server) we route through the same-origin proxy
+ * (/sse → localhost:3000) to avoid CORS. In production the admin is served
+ * from the same origin as the MCP server so no CORS is needed either.
+ */
+function sseUrl(serverUrl: string): URL {
+  if (import.meta.env.DEV) {
+    // Vite proxies /sse → MCP_SERVER — same origin, no CORS
+    return new URL("/sse", window.location.origin);
+  }
+  return new URL(`${serverUrl}/sse`);
+}
+
 export async function connectMcp(serverUrl: string): Promise<Client> {
   if (_client) {
     await _client.close().catch(() => null);
     _client = null;
   }
-  const transport = new SSEClientTransport(new URL(`${serverUrl}/sse`));
+  const transport = new SSEClientTransport(sseUrl(serverUrl));
   const client = new Client(
     { name: "ferrisletter-admin", version: "0.1.0" },
     { capabilities: {} },
