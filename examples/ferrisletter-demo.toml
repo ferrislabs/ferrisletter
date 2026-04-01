@@ -75,3 +75,15 @@ topic_label       = "Open Source"
 topic_description = "Open-source projects, releases, and developer news"
 topic_tags        = ["open-source", "github", "dev"]
 url               = "https://github.blog/feed/"
+
+# --------------------------------------------------------------------------
+# MCP App UI — served at http://127.0.0.1:3002 and registered as an MCP
+# resource so Claude Desktop can render the Ferrisletter digest panel.
+#
+# Requires the UI to be built first:
+#   cd ui && npm install && npm run build
+# --------------------------------------------------------------------------
+
+[ui]
+enabled   = true
+bind_addr = "127.0.0.1:3002"

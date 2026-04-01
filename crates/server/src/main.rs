@@ -1,6 +1,7 @@
 mod api;
 mod config;
 mod server;
+mod ui_server;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -73,7 +74,22 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    let mcp_server = FerrislletterServer::new(connector_handle);
+    // Spawn the MCP App UI HTTP server if enabled.
+    let ui_url = if cfg.ui.enabled {
+        let bind_addr = cfg.ui.bind_addr.clone();
+        let url = format!("http://{}", bind_addr);
+        tokio::spawn(async move {
+            if let Err(e) = ui_server::serve(&bind_addr).await {
+                tracing::error!("UI server error: {e}");
+            }
+        });
+        tracing::info!(url, "MCP App UI enabled");
+        Some(url)
+    } else {
+        None
+    };
+
+    let mcp_server = FerrislletterServer::new(connector_handle, ui_url);
 
     // Start MCP transport.
     match cfg.transport.mode {

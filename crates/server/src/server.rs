@@ -6,8 +6,13 @@ use chrono::DateTime;
 use ferrisletter_connector::{BoxedConnector, Connector, SearchFilters, UserPrefs};
 use rmcp::{
     ServerHandler,
-    model::{Implementation, ServerCapabilities, ServerInfo},
+    model::{
+        AnnotateAble, Implementation, ListResourcesResult, PaginatedRequestParam, RawResource,
+        ReadResourceRequestParam, ReadResourceResult, ResourceContents, ResourcesCapability,
+        ServerCapabilities, ServerInfo, ToolsCapability,
+    },
     schemars, tool,
+    service::RequestContext,
 };
 use serde::Deserialize;
 
@@ -20,11 +25,13 @@ use crate::api::ConnectorHandle;
 #[derive(Clone)]
 pub struct FerrislletterServer {
     connector: ConnectorHandle,
+    /// URL of the embedded MCP App UI, if enabled (e.g. `http://localhost:3002`).
+    pub ui_url: Option<String>,
 }
 
 impl FerrislletterServer {
-    pub fn new(connector: ConnectorHandle) -> Self {
-        Self { connector }
+    pub fn new(connector: ConnectorHandle, ui_url: Option<String>) -> Self {
+        Self { connector, ui_url }
     }
 
     /// Borrow the active connector for one request.
@@ -202,6 +209,14 @@ impl FerrislletterServer {
 #[tool(tool_box)]
 impl ServerHandler for FerrislletterServer {
     fn get_info(&self) -> ServerInfo {
+        let capabilities = ServerCapabilities {
+            tools: Some(ToolsCapability { list_changed: None }),
+            resources: self
+                .ui_url
+                .as_ref()
+                .map(|_| ResourcesCapability { list_changed: None, subscribe: None }),
+            ..Default::default()
+        };
         ServerInfo {
             server_info: Implementation {
                 name: "ferrisletter".into(),
@@ -216,8 +231,48 @@ impl ServerHandler for FerrislletterServer {
                 or catch up on what you missed with `ferrisletter_recap`."
                     .into(),
             ),
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
+            capabilities,
             ..Default::default()
         }
+    }
+
+    async fn list_resources(
+        &self,
+        _request: PaginatedRequestParam,
+        _context: RequestContext<rmcp::RoleServer>,
+    ) -> Result<ListResourcesResult, rmcp::Error> {
+        let Some(url) = &self.ui_url else {
+            return Ok(ListResourcesResult::default());
+        };
+        let mut raw = RawResource::new(url.clone(), "Ferrisletter");
+        raw.description = Some("Interactive newsletter digest".into());
+        raw.mime_type = Some("text/html".into());
+        Ok(ListResourcesResult {
+            resources: vec![raw.no_annotation()],
+            next_cursor: None,
+        })
+    }
+
+    async fn read_resource(
+        &self,
+        request: ReadResourceRequestParam,
+        _context: RequestContext<rmcp::RoleServer>,
+    ) -> Result<ReadResourceResult, rmcp::Error> {
+        let Some(url) = &self.ui_url else {
+            return Err(rmcp::Error::invalid_params("UI not enabled", None));
+        };
+        if request.uri != *url {
+            return Err(rmcp::Error::invalid_params(
+                format!("unknown resource '{}'", request.uri),
+                None,
+            ));
+        }
+        Ok(ReadResourceResult {
+            contents: vec![ResourceContents::TextResourceContents {
+                uri: url.clone(),
+                mime_type: Some("text/html".into()),
+                text: crate::ui_server::UI_BUNDLE.to_string(),
+            }],
+        })
     }
 }

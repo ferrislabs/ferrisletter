@@ -23,6 +23,9 @@ pub struct Config {
 
     #[serde(default)]
     pub admin: AdminConfig,
+
+    #[serde(default)]
+    pub ui: UiConfig,
 }
 
 // --- Admin REST API ---
@@ -52,6 +55,31 @@ impl Default for AdminConfig {
 
 fn default_admin_bind() -> String {
     "127.0.0.1:3001".to_string()
+}
+
+// --- MCP App UI ---
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct UiConfig {
+    /// Serve the embedded MCP App UI over HTTP.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Address to bind the UI HTTP server on.
+    #[serde(default = "default_ui_bind")]
+    pub bind_addr: String,
+}
+
+impl Default for UiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind_addr: default_ui_bind(),
+        }
+    }
+}
+
+fn default_ui_bind() -> String {
+    "127.0.0.1:3002".to_string()
 }
 
 // --- Transport ---
