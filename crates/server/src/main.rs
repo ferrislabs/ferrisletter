@@ -1,7 +1,6 @@
 mod api;
 mod config;
 mod server;
-mod ui_server;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -11,8 +10,12 @@ use ferrisletter_connector_rss::{FeedConfig as RssFeedConfig, RssConnector};
 use ferrisletter_connector_static::StaticConnector;
 use rmcp::ServiceExt;
 use rmcp::transport::stdio;
+use rmcp::transport::streamable_http_server::{
+    StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
+};
 use server::FerrislletterServer;
 use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 
 use crate::api::{ApiState, ConnectorHandle, FeedRecord, TopicRecord};
 use crate::config::{ConnectorConfig, TransportMode};
@@ -74,34 +77,38 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    // Spawn the MCP App UI HTTP server if enabled.
-    let ui_url = if cfg.ui.enabled {
-        let bind_addr = cfg.ui.bind_addr.clone();
-        let url = format!("http://{}", bind_addr);
-        tokio::spawn(async move {
-            if let Err(e) = ui_server::serve(&bind_addr).await {
-                tracing::error!("UI server error: {e}");
-            }
-        });
-        tracing::info!(url, "MCP App UI enabled");
-        Some(url)
-    } else {
-        None
-    };
+    if cfg.ui.enabled {
+        tracing::info!(
+            resource = server::UI_RESOURCE_URI,
+            "MCP App UI enabled (mcpui.dev)"
+        );
+    }
 
-    let mcp_server = FerrislletterServer::new(connector_handle, ui_url);
+    let mcp_server = FerrislletterServer::new(connector_handle, cfg.ui.enabled);
 
     // Start MCP transport.
     match cfg.transport.mode {
         TransportMode::Sse => {
             let addr: SocketAddr =
                 format!("{}:{}", cfg.transport.host, cfg.transport.port).parse()?;
-            tracing::info!(%addr, "serving MCP over SSE");
-            let ct = rmcp::transport::sse_server::SseServer::serve(addr)
-                .await?
-                .with_service(move || mcp_server.clone());
-            tokio::signal::ctrl_c().await?;
-            ct.cancel();
+            tracing::info!(%addr, "serving MCP over streamable HTTP");
+
+            let ct = CancellationToken::new();
+            let service: StreamableHttpService<FerrislletterServer, LocalSessionManager> =
+                StreamableHttpService::new(
+                    {
+                        let s = mcp_server.clone();
+                        move || Ok(s.clone())
+                    },
+                    Default::default(),
+                    StreamableHttpServerConfig::default().with_cancellation_token(ct.child_token()),
+                );
+
+            let router = axum::Router::new().nest_service("/mcp", service);
+            let listener = tokio::net::TcpListener::bind(addr).await?;
+            axum::serve(listener, router)
+                .with_graceful_shutdown(async move { ct.cancelled_owned().await })
+                .await?;
         }
         TransportMode::Stdio => {
             tracing::info!("serving MCP over stdio");

@@ -5,19 +5,26 @@ use std::sync::Arc;
 use chrono::DateTime;
 use ferrisletter_connector::{BoxedConnector, Connector, SearchFilters, UserPrefs};
 use rmcp::{
-    ServerHandler,
+    ErrorData, ServerHandler,
+    handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{
-        AnnotateAble, Implementation, ListResourcesResult, PaginatedRequestParam, RawResource,
-        ReadResourceRequestParam, ReadResourceResult, ResourceContents, ResourcesCapability,
-        ServerCapabilities, ServerInfo, ToolsCapability,
+        AnnotateAble, CallToolResult, Content, Implementation, ListResourcesResult, Meta,
+        PaginatedRequestParams, RawResource, ReadResourceRequestParams, ReadResourceResult,
+        ResourceContents, ServerCapabilities, ServerInfo,
     },
     schemars,
     service::RequestContext,
-    tool,
+    tool, tool_handler, tool_router,
 };
 use serde::Deserialize;
 
 use crate::api::ConnectorHandle;
+
+/// MCP resource URI for the embedded App UI (mcpui.dev spec).
+pub const UI_RESOURCE_URI: &str = "ui://ferrisletter/app";
+
+/// The HTML bundle embedded at compile time by build.rs.
+const UI_BUNDLE: &str = include_str!(concat!(env!("OUT_DIR"), "/ui_bundle.html"));
 
 /// The Ferrisletter MCP server.
 ///
@@ -26,19 +33,40 @@ use crate::api::ConnectorHandle;
 #[derive(Clone)]
 pub struct FerrislletterServer {
     connector: ConnectorHandle,
-    /// URL of the embedded MCP App UI, if enabled (e.g. `http://localhost:3002`).
-    pub ui_url: Option<String>,
+    /// Whether the MCP App UI resource is enabled.
+    pub ui_enabled: bool,
+    tool_router: ToolRouter<Self>,
 }
 
 impl FerrislletterServer {
-    pub fn new(connector: ConnectorHandle, ui_url: Option<String>) -> Self {
-        Self { connector, ui_url }
+    pub fn new(connector: ConnectorHandle, ui_enabled: bool) -> Self {
+        Self {
+            connector,
+            ui_enabled,
+            tool_router: Self::tool_router(),
+        }
     }
 
     /// Borrow the active connector for one request.
     async fn conn(&self) -> Arc<BoxedConnector> {
         self.connector.read().await.clone()
     }
+}
+
+/// Build `_meta: { "ui": { "resourceUri": "ui://ferrisletter/app" } }` for
+/// tool call results, following the mcpui.dev spec.
+fn ui_meta() -> Meta {
+    let mut meta = Meta::new();
+    meta.insert(
+        "ui".to_string(),
+        serde_json::json!({ "resourceUri": UI_RESOURCE_URI }),
+    );
+    meta
+}
+
+/// Wrap serialised JSON in a successful `CallToolResult` with UI metadata.
+fn tool_ok(json: String) -> CallToolResult {
+    CallToolResult::success(vec![Content::text(json)]).with_meta(Some(ui_meta()))
 }
 
 // --- Tool parameter types ---
@@ -85,21 +113,23 @@ pub struct RecapParams {
 
 // --- Tools ---
 
-#[tool(tool_box)]
+#[tool_router]
 impl FerrislletterServer {
     /// List available newsletter topics.
     #[tool(
         description = "List available newsletter topics and their descriptions. \
         Call this first to discover what content is available."
     )]
-    async fn ferrisletter_list_topics(&self) -> Result<String, String> {
+    async fn ferrisletter_list_topics(&self) -> Result<CallToolResult, ErrorData> {
         let topics = self
             .conn()
             .await
             .list_topics()
             .await
-            .map_err(|e| e.to_string())?;
-        serde_json::to_string_pretty(&topics).map_err(|e| e.to_string())
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let json = serde_json::to_string_pretty(&topics)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        Ok(tool_ok(json))
     }
 
     /// Get the latest items from the newsletter.
@@ -110,8 +140,8 @@ impl FerrislletterServer {
     )]
     async fn ferrisletter_get_latest(
         &self,
-        #[tool(aggr)] params: GetLatestParams,
-    ) -> Result<String, String> {
+        Parameters(params): Parameters<GetLatestParams>,
+    ) -> Result<CallToolResult, ErrorData> {
         let prefs = UserPrefs {
             topics_of_interest: params.topics.unwrap_or_default(),
             max_items: params.max_items,
@@ -122,8 +152,10 @@ impl FerrislletterServer {
             .await
             .get_latest_items(&prefs)
             .await
-            .map_err(|e| e.to_string())?;
-        serde_json::to_string_pretty(&items).map_err(|e| e.to_string())
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let json = serde_json::to_string_pretty(&items)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        Ok(tool_ok(json))
     }
 
     /// Get the full content of a specific item.
@@ -133,15 +165,17 @@ impl FerrislletterServer {
     )]
     async fn ferrisletter_get_item(
         &self,
-        #[tool(aggr)] params: GetItemParams,
-    ) -> Result<String, String> {
+        Parameters(params): Parameters<GetItemParams>,
+    ) -> Result<CallToolResult, ErrorData> {
         let detail = self
             .conn()
             .await
             .get_item_detail(&params.id)
             .await
-            .map_err(|e| e.to_string())?;
-        serde_json::to_string_pretty(&detail).map_err(|e| e.to_string())
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let json = serde_json::to_string_pretty(&detail)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        Ok(tool_ok(json))
     }
 
     /// Search newsletter content.
@@ -152,12 +186,14 @@ impl FerrislletterServer {
     )]
     async fn ferrisletter_search(
         &self,
-        #[tool(aggr)] params: SearchParams,
-    ) -> Result<String, String> {
+        Parameters(params): Parameters<SearchParams>,
+    ) -> Result<CallToolResult, ErrorData> {
         let parse_dt = |s: &str| {
             DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.with_timezone(&chrono::Utc))
-                .map_err(|e| format!("invalid datetime '{s}': {e}"))
+                .map_err(|e| {
+                    ErrorData::invalid_params(format!("invalid datetime '{s}': {e}"), None)
+                })
         };
 
         let filters = SearchFilters {
@@ -173,8 +209,10 @@ impl FerrislletterServer {
             .await
             .search(&params.query, &filters)
             .await
-            .map_err(|e| e.to_string())?;
-        serde_json::to_string_pretty(&items).map_err(|e| e.to_string())
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let json = serde_json::to_string_pretty(&items)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        Ok(tool_ok(json))
     }
 
     /// Get a recap of items published since a given date.
@@ -185,11 +223,13 @@ impl FerrislletterServer {
     )]
     async fn ferrisletter_recap(
         &self,
-        #[tool(aggr)] params: RecapParams,
-    ) -> Result<String, String> {
+        Parameters(params): Parameters<RecapParams>,
+    ) -> Result<CallToolResult, ErrorData> {
         let since = DateTime::parse_from_rfc3339(&params.since)
             .map(|dt| dt.with_timezone(&chrono::Utc))
-            .map_err(|e| format!("invalid datetime '{}': {e}", params.since))?;
+            .map_err(|e| {
+                ErrorData::invalid_params(format!("invalid datetime '{}': {e}", params.since), None)
+            })?;
 
         let prefs = UserPrefs {
             topics_of_interest: params.topics.unwrap_or_default(),
@@ -202,53 +242,52 @@ impl FerrislletterServer {
             .await
             .get_recap(since, &prefs)
             .await
-            .map_err(|e| e.to_string())?;
-        serde_json::to_string_pretty(&items).map_err(|e| e.to_string())
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let json = serde_json::to_string_pretty(&items)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        Ok(tool_ok(json))
     }
 }
 
-#[tool(tool_box)]
+#[tool_handler(router = self.tool_router)]
 impl ServerHandler for FerrislletterServer {
     fn get_info(&self) -> ServerInfo {
-        let capabilities = ServerCapabilities {
-            tools: Some(ToolsCapability { list_changed: None }),
-            resources: self.ui_url.as_ref().map(|_| ResourcesCapability {
-                list_changed: None,
-                subscribe: None,
-            }),
-            ..Default::default()
+        let caps = if self.ui_enabled {
+            ServerCapabilities::builder()
+                .enable_tools()
+                .enable_resources()
+                .build()
+        } else {
+            ServerCapabilities::builder().enable_tools().build()
         };
-        ServerInfo {
-            server_info: Implementation {
-                name: "ferrisletter".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-            },
-            instructions: Some(
+        ServerInfo::new(caps)
+            .with_server_info(Implementation::new(
+                "ferrisletter",
+                env!("CARGO_PKG_VERSION"),
+            ))
+            .with_instructions(
                 "Ferrisletter is a conversational newsletter platform. \
                 Start with `ferrisletter_list_topics` to see what's available, \
                 then `ferrisletter_get_latest` to browse headlines. \
                 Expand anything interesting with `ferrisletter_get_item`, \
                 search across past content with `ferrisletter_search`, \
-                or catch up on what you missed with `ferrisletter_recap`."
-                    .into(),
-            ),
-            capabilities,
-            ..Default::default()
-        }
+                or catch up on what you missed with `ferrisletter_recap`.",
+            )
     }
 
     async fn list_resources(
         &self,
-        _request: PaginatedRequestParam,
+        _request: Option<PaginatedRequestParams>,
         _context: RequestContext<rmcp::RoleServer>,
-    ) -> Result<ListResourcesResult, rmcp::Error> {
-        let Some(url) = &self.ui_url else {
+    ) -> Result<ListResourcesResult, ErrorData> {
+        if !self.ui_enabled {
             return Ok(ListResourcesResult::default());
-        };
-        let mut raw = RawResource::new(url.clone(), "Ferrisletter");
+        }
+        let mut raw = RawResource::new(UI_RESOURCE_URI, "Ferrisletter");
         raw.description = Some("Interactive newsletter digest".into());
         raw.mime_type = Some("text/html".into());
         Ok(ListResourcesResult {
+            meta: None,
             resources: vec![raw.no_annotation()],
             next_cursor: None,
         })
@@ -256,24 +295,20 @@ impl ServerHandler for FerrislletterServer {
 
     async fn read_resource(
         &self,
-        request: ReadResourceRequestParam,
+        request: ReadResourceRequestParams,
         _context: RequestContext<rmcp::RoleServer>,
-    ) -> Result<ReadResourceResult, rmcp::Error> {
-        let Some(url) = &self.ui_url else {
-            return Err(rmcp::Error::invalid_params("UI not enabled", None));
-        };
-        if request.uri != *url {
-            return Err(rmcp::Error::invalid_params(
+    ) -> Result<ReadResourceResult, ErrorData> {
+        if !self.ui_enabled {
+            return Err(ErrorData::invalid_params("UI not enabled", None));
+        }
+        if request.uri != UI_RESOURCE_URI {
+            return Err(ErrorData::invalid_params(
                 format!("unknown resource '{}'", request.uri),
                 None,
             ));
         }
-        Ok(ReadResourceResult {
-            contents: vec![ResourceContents::TextResourceContents {
-                uri: url.clone(),
-                mime_type: Some("text/html".into()),
-                text: crate::ui_server::UI_BUNDLE.to_string(),
-            }],
-        })
+        Ok(ReadResourceResult::new(vec![
+            ResourceContents::text(UI_BUNDLE, UI_RESOURCE_URI).with_mime_type("text/html"),
+        ]))
     }
 }

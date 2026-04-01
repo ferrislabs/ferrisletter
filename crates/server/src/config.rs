@@ -59,27 +59,17 @@ fn default_admin_bind() -> String {
 
 // --- MCP App UI ---
 
-#[derive(Debug, Deserialize, Clone)]
+/// Enables the MCP App UI (mcpui.dev spec).
+///
+/// When enabled the server registers `ui://ferrisletter/app` as an MCP
+/// resource and includes `_meta.ui.resourceUri` in every tool call result,
+/// so that supporting clients (Claude Desktop, etc.) render the digest panel
+/// automatically.
+#[derive(Debug, Default, Deserialize, Clone)]
 pub struct UiConfig {
-    /// Serve the embedded MCP App UI over HTTP.
+    /// Register the UI resource and annotate tool results with its URI.
     #[serde(default)]
     pub enabled: bool,
-    /// Address to bind the UI HTTP server on.
-    #[serde(default = "default_ui_bind")]
-    pub bind_addr: String,
-}
-
-impl Default for UiConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            bind_addr: default_ui_bind(),
-        }
-    }
-}
-
-fn default_ui_bind() -> String {
-    "127.0.0.1:3002".to_string()
 }
 
 // --- Transport ---
