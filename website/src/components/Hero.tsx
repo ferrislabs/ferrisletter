@@ -17,10 +17,30 @@ export default function Hero() {
           visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         }`}
       >
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[var(--color-tag-bg)] border border-[var(--color-tag-border)] rounded-full text-sm font-medium text-[var(--color-text-muted)] mb-8">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[var(--color-tag-bg)] border border-[var(--color-tag-border)] rounded-full text-sm font-medium text-[var(--color-text-muted)] mb-3">
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
           Open source &middot; MCP-native &middot; POC
         </div>
+        <p className="text-xs text-[var(--color-text-dim)] mb-8">
+          by{' '}
+          <a
+            href="https://github.com/ferrislabs"
+            target="_blank"
+            rel="noopener"
+            className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors font-medium"
+          >
+            Ferrislabs
+          </a>
+          {' '}&middot;{' '}the team behind{' '}
+          <a
+            href="https://github.com/ferriskey"
+            target="_blank"
+            rel="noopener"
+            className="text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors font-medium"
+          >
+            FerrisKey
+          </a>
+        </p>
 
         <h1 className="text-[clamp(3rem,8vw,5.5rem)] font-black leading-[1.05] tracking-[-0.04em] mb-6">
           Newsletters that

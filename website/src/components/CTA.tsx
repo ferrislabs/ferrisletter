@@ -55,9 +55,23 @@ export default function CTA() {
 
       <footer className="py-8 border-t border-[var(--color-border)] relative z-[1]">
         <div className="max-w-[1200px] mx-auto px-8 flex items-center justify-between max-sm:flex-col max-sm:gap-3 max-sm:text-center">
-          <div className="flex items-center gap-2 font-bold text-base">
-            <span className="text-[var(--color-accent)]">&#9671;</span>
-            <span>ferrisletter</span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2 font-bold text-base">
+              <span className="text-[var(--color-accent)]">&#9671;</span>
+              <span>ferrisletter</span>
+            </div>
+            <span className="text-[0.65rem] text-[var(--color-text-dim)] pl-5">
+              a{' '}
+              <a
+                href="https://github.com/ferrislabs"
+                target="_blank"
+                rel="noopener"
+                className="hover:text-[var(--color-text-muted)] transition-colors"
+              >
+                Ferrislabs
+              </a>
+              {' '}project
+            </span>
           </div>
           <div className="flex items-center gap-4">
             <a href="https://github.com/ferrislabs/ferrisletter" target="_blank" rel="noopener" className="text-xs text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors">GitHub</a>
