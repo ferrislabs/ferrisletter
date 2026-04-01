@@ -54,19 +54,16 @@ echo "  ✓ $BINARY"
 # Locate Claude Desktop config file
 # --------------------------------------------------------------------------
 
-case "$(uname -s)" in
-  Darwin)
-    CLAUDE_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-    ;;
-  Linux)
-    CLAUDE_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/Claude/claude_desktop_config.json"
-    ;;
-  *)
-    echo "Unsupported OS. Add the config manually:" >&2
-    print_manual_config
-    exit 1
-    ;;
-esac
+_OS="$(uname -s)"
+if [[ "$_OS" == Darwin* ]]; then
+  CLAUDE_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+elif [[ "$_OS" == Linux* ]]; then
+  CLAUDE_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/Claude/claude_desktop_config.json"
+else
+  echo "Unsupported OS ($_OS). Add the config manually:" >&2
+  print_manual_config
+  exit 1
+fi
 
 mkdir -p "$(dirname "$CLAUDE_CONFIG")"
 
