@@ -1,53 +1,78 @@
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Hash } from "lucide-react";
+import { RefreshCw, Hash, Plus, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import { TopicDialog } from "@/components/topic-dialog";
 import { listTopics, getLatestItems } from "@/lib/mcp";
-import type { Topic } from "@/types";
+import { useDraftStore } from "@/store/draft";
+import type { DraftTopic } from "@/types";
 
-function TopicRow({ topic, itemCount }: { topic: Topic; itemCount: number }) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-4 border-b border-[var(--color-border)] last:border-0">
-      <div className="flex items-start gap-3 min-w-0">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--color-accent-subtle)]">
-          <Hash size={14} className="text-[var(--color-accent)]" />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-[var(--color-text)]">{topic.label}</p>
-            <code className="text-[11px] font-mono text-[var(--color-text-dim)] bg-[var(--color-surface)] px-1.5 py-0.5 rounded">
-              {topic.id}
-            </code>
-          </div>
-          <p className="mt-0.5 text-xs text-[var(--color-text-muted)] truncate">
-            {topic.description}
-          </p>
-          {topic.tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {topic.tags.map((tag) => (
-                <Badge key={tag} variant="secondary">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      <Badge variant="outline" className="shrink-0">
-        {itemCount} items
-      </Badge>
-    </div>
-  );
+function allTags(topics: DraftTopic[]): string[] {
+  return [...new Set(topics.flatMap((t) => t.tags))].sort();
 }
 
 export function Topics() {
+  const { topics, feeds, syncTopics, addTopic, updateTopic, deleteTopic } = useDraftStore();
+
   const topicsQuery = useQuery({ queryKey: ["topics"], queryFn: listTopics });
   const itemsQuery = useQuery({ queryKey: ["items"], queryFn: () => getLatestItems() });
-
-  const topics = topicsQuery.data ?? [];
   const items = itemsQuery.data ?? [];
+
+  // Seed draft store from server on first load
+  useEffect(() => {
+    if (topicsQuery.data) {
+      syncTopics(topicsQuery.data);
+    }
+  }, [topicsQuery.data, syncTopics]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<DraftTopic | undefined>();
+
+  function openCreate() {
+    setEditingTopic(undefined);
+    setDialogOpen(true);
+  }
+
+  function openEdit(topic: DraftTopic) {
+    setEditingTopic(topic);
+    setDialogOpen(true);
+  }
+
+  function handleSave(topic: DraftTopic) {
+    if (editingTopic) {
+      updateTopic(topic.id, { label: topic.label, description: topic.description, tags: topic.tags });
+      toast.success("Topic updated");
+    } else {
+      if (topics.some((t) => t.id === topic.id)) {
+        toast.error(`A topic with id "${topic.id}" already exists`);
+        return;
+      }
+      addTopic(topic);
+      toast.success("Topic created");
+    }
+  }
+
+  function handleDelete(topic: DraftTopic) {
+    deleteTopic(topic.id);
+    toast.success(`Topic "${topic.label}" deleted`);
+  }
+
   const isLoading = topicsQuery.isLoading;
+  const tags = allTags(topics);
 
   return (
     <div className="p-6 space-y-6">
@@ -58,15 +83,21 @@ export function Topics() {
             Content categories served by your connectors
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void topicsQuery.refetch()}
-          disabled={topicsQuery.isFetching}
-        >
-          <RefreshCw size={13} className={topicsQuery.isFetching ? "animate-spin" : ""} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void topicsQuery.refetch()}
+            disabled={topicsQuery.isFetching}
+          >
+            <RefreshCw size={13} className={topicsQuery.isFetching ? "animate-spin" : ""} />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <Plus size={13} />
+            New topic
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -75,7 +106,9 @@ export function Topics() {
             <div>
               <CardTitle>All topics</CardTitle>
               <CardDescription>
-                {isLoading ? "Loading…" : `${topics.length} topic${topics.length !== 1 ? "s" : ""} configured`}
+                {isLoading
+                  ? "Loading…"
+                  : `${topics.length} topic${topics.length !== 1 ? "s" : ""} configured`}
               </CardDescription>
             </div>
           </div>
@@ -84,20 +117,105 @@ export function Topics() {
           {isLoading ? (
             <p className="py-4 text-sm text-[var(--color-text-dim)]">Loading topics…</p>
           ) : topics.length === 0 ? (
-            <p className="py-4 text-sm text-[var(--color-text-dim)] text-center">
-              No topics found. Check your server configuration.
+            <p className="py-8 text-sm text-[var(--color-text-dim)] text-center">
+              No topics yet.{" "}
+              <button
+                className="text-[var(--color-accent)] hover:underline"
+                onClick={openCreate}
+              >
+                Create your first topic.
+              </button>
             </p>
           ) : (
-            topics.map((topic) => (
-              <TopicRow
-                key={topic.id}
-                topic={topic}
-                itemCount={items.filter((i) => i.topic_id === topic.id).length}
-              />
-            ))
+            topics.map((topic) => {
+              const itemCount = items.filter((i) => i.topic_id === topic.id).length;
+              const feedCount = feeds.filter((f) => f.topic_id === topic.id).length;
+              return (
+                <div
+                  key={topic.id}
+                  className="flex items-start justify-between gap-4 py-4 border-b border-[var(--color-border)] last:border-0"
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--color-accent-subtle)]">
+                      <Hash size={14} className="text-[var(--color-accent)]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-[var(--color-text)]">
+                          {topic.label}
+                        </p>
+                        <code className="text-[11px] font-mono text-[var(--color-text-dim)] bg-[var(--color-surface)] px-1.5 py-0.5 rounded">
+                          {topic.id}
+                        </code>
+                      </div>
+                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)] truncate">
+                        {topic.description}
+                      </p>
+                      {topic.tags.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {topic.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant="outline">{itemCount} items</Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => openEdit(topic)}
+                      title="Edit topic"
+                    >
+                      <Pencil size={13} />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-[var(--color-destructive)] hover:text-[var(--color-destructive)]"
+                          title="Delete topic"
+                        >
+                          <Trash2 size={13} />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete "{topic.label}"?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will remove the topic from your draft config.
+                            {feedCount > 0 && (
+                              <> It will also remove {feedCount} feed{feedCount !== 1 ? "s" : ""} assigned to this topic.</>
+                            )}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(topic)}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              );
+            })
           )}
         </CardContent>
       </Card>
+
+      <TopicDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        topic={editingTopic}
+        allTags={tags}
+        onSave={handleSave}
+      />
     </div>
   );
 }
