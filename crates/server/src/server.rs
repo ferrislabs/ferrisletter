@@ -11,17 +11,25 @@ use rmcp::{
 };
 use serde::Deserialize;
 
+use crate::api::ConnectorHandle;
+
 /// The Ferrisletter MCP server.
 ///
-/// Holds a type-erased connector and exposes newsletter content as MCP tools.
+/// Holds a handle to the active connector so that live hot-reload via the
+/// management REST API is reflected in subsequent tool calls without a restart.
 #[derive(Clone)]
 pub struct FerrislletterServer {
-    connector: Arc<BoxedConnector>,
+    connector: ConnectorHandle,
 }
 
 impl FerrislletterServer {
-    pub fn new(connector: Arc<BoxedConnector>) -> Self {
+    pub fn new(connector: ConnectorHandle) -> Self {
         Self { connector }
+    }
+
+    /// Borrow the active connector for one request.
+    async fn conn(&self) -> Arc<BoxedConnector> {
+        self.connector.read().await.clone()
     }
 }
 
@@ -78,7 +86,8 @@ impl FerrislletterServer {
     )]
     async fn ferrisletter_list_topics(&self) -> Result<String, String> {
         let topics = self
-            .connector
+            .conn()
+            .await
             .list_topics()
             .await
             .map_err(|e| e.to_string())?;
@@ -101,7 +110,8 @@ impl FerrislletterServer {
             ..Default::default()
         };
         let items = self
-            .connector
+            .conn()
+            .await
             .get_latest_items(&prefs)
             .await
             .map_err(|e| e.to_string())?;
@@ -118,7 +128,8 @@ impl FerrislletterServer {
         #[tool(aggr)] params: GetItemParams,
     ) -> Result<String, String> {
         let detail = self
-            .connector
+            .conn()
+            .await
             .get_item_detail(&params.id)
             .await
             .map_err(|e| e.to_string())?;
@@ -150,7 +161,8 @@ impl FerrislletterServer {
         };
 
         let items = self
-            .connector
+            .conn()
+            .await
             .search(&params.query, &filters)
             .await
             .map_err(|e| e.to_string())?;
@@ -178,7 +190,8 @@ impl FerrislletterServer {
         };
 
         let items = self
-            .connector
+            .conn()
+            .await
             .get_recap(since, &prefs)
             .await
             .map_err(|e| e.to_string())?;

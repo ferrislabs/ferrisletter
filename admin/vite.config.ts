@@ -7,6 +7,10 @@ import path from "path";
 // Set VITE_MCP_SERVER_URL in .env.local to override.
 const MCP_SERVER = process.env.VITE_MCP_SERVER_URL ?? "http://localhost:3000";
 
+// Admin REST API URL — only used by the dev proxy.
+// Set VITE_ADMIN_API_URL in .env.local to override.
+const ADMIN_API = process.env.VITE_ADMIN_API_URL ?? "http://localhost:3001";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -20,6 +24,7 @@ export default defineConfig({
     proxy: {
       "/sse": { target: MCP_SERVER, changeOrigin: true },
       "/message": { target: MCP_SERVER, changeOrigin: true },
+      "/api": { target: ADMIN_API, changeOrigin: true },
     },
   },
   preview: {
@@ -28,6 +33,7 @@ export default defineConfig({
     proxy: {
       "/sse": { target: MCP_SERVER, changeOrigin: true },
       "/message": { target: MCP_SERVER, changeOrigin: true },
+      "/api": { target: ADMIN_API, changeOrigin: true },
     },
   },
   build: {

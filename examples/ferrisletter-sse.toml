@@ -6,3 +6,8 @@ port = 3000
 [connector]
 type = "static"
 path = "examples/sample-newsletter.json"
+
+[admin]
+enabled   = true
+api_key   = "ferrisletter-dev"
+bind_addr = "127.0.0.1:3001"

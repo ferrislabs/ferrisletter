@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Hash, Plus, Pencil, Trash2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw, Hash, Plus, Pencil, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { TopicDialog } from "@/components/topic-dialog";
 import { listTopics, getLatestItems } from "@/lib/mcp";
+import {
+  apiListTopics,
+  apiCreateTopic,
+  apiUpdateTopic,
+  apiDeleteTopic,
+  apiHealthCheck,
+} from "@/lib/api";
 import { useDraftStore } from "@/store/draft";
+import { useConnectionStore } from "@/store/connection";
 import type { DraftTopic } from "@/types";
 
 function allTags(topics: DraftTopic[]): string[] {
@@ -27,48 +35,96 @@ function allTags(topics: DraftTopic[]): string[] {
 
 export function Topics() {
   const { topics, feeds, syncTopics, addTopic, updateTopic, deleteTopic } = useDraftStore();
+  const { apiKey } = useConnectionStore();
+  const queryClient = useQueryClient();
 
   const topicsQuery = useQuery({ queryKey: ["topics"], queryFn: listTopics });
   const itemsQuery = useQuery({ queryKey: ["items"], queryFn: () => getLatestItems() });
   const items = itemsQuery.data ?? [];
 
-  // Seed draft store from server on first load
+  // Check if the REST API is available.
+  const [apiAvailable, setApiAvailable] = useState(false);
   useEffect(() => {
-    if (topicsQuery.data) {
-      syncTopics(topicsQuery.data);
+    if (apiKey) {
+      apiHealthCheck(apiKey).then(setApiAvailable);
+    } else {
+      setApiAvailable(false);
     }
+  }, [apiKey]);
+
+  // Seed draft store from server on first load.
+  useEffect(() => {
+    if (topicsQuery.data) syncTopics(topicsQuery.data);
   }, [topicsQuery.data, syncTopics]);
+
+  // If API is available, sync live topics into draft store.
+  useEffect(() => {
+    if (apiAvailable && apiKey) {
+      apiListTopics(apiKey).then((apiTopics) => {
+        apiTopics.forEach((t) => {
+          if (!topics.some((d) => d.id === t.id)) addTopic(t);
+        });
+      }).catch(() => null);
+    }
+  }, [apiAvailable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTopic, setEditingTopic] = useState<DraftTopic | undefined>();
 
-  function openCreate() {
-    setEditingTopic(undefined);
-    setDialogOpen(true);
-  }
+  function openCreate() { setEditingTopic(undefined); setDialogOpen(true); }
+  function openEdit(topic: DraftTopic) { setEditingTopic(topic); setDialogOpen(true); }
 
-  function openEdit(topic: DraftTopic) {
-    setEditingTopic(topic);
-    setDialogOpen(true);
-  }
-
-  function handleSave(topic: DraftTopic) {
+  async function handleSave(topic: DraftTopic) {
     if (editingTopic) {
-      updateTopic(topic.id, { label: topic.label, description: topic.description, tags: topic.tags });
-      toast.success("Topic updated");
+      const patch = { label: topic.label, description: topic.description, tags: topic.tags };
+      if (apiAvailable && apiKey) {
+        try {
+          await apiUpdateTopic(apiKey, topic.id, patch);
+          toast.success("Topic updated (live)");
+          void queryClient.invalidateQueries({ queryKey: ["topics"] });
+        } catch (e) {
+          toast.error(`API error: ${e instanceof Error ? e.message : String(e)}`);
+          return;
+        }
+      } else {
+        toast.success("Topic updated (draft)");
+      }
+      updateTopic(topic.id, patch);
     } else {
       if (topics.some((t) => t.id === topic.id)) {
         toast.error(`A topic with id "${topic.id}" already exists`);
         return;
       }
+      if (apiAvailable && apiKey) {
+        try {
+          await apiCreateTopic(apiKey, topic);
+          toast.success("Topic created (live)");
+          void queryClient.invalidateQueries({ queryKey: ["topics"] });
+        } catch (e) {
+          toast.error(`API error: ${e instanceof Error ? e.message : String(e)}`);
+          return;
+        }
+      } else {
+        toast.success("Topic created (draft)");
+      }
       addTopic(topic);
-      toast.success("Topic created");
     }
   }
 
-  function handleDelete(topic: DraftTopic) {
+  async function handleDelete(topic: DraftTopic) {
+    if (apiAvailable && apiKey) {
+      try {
+        await apiDeleteTopic(apiKey, topic.id);
+        toast.success(`Topic "${topic.label}" deleted (live)`);
+        void queryClient.invalidateQueries({ queryKey: ["topics"] });
+      } catch (e) {
+        toast.error(`API error: ${e instanceof Error ? e.message : String(e)}`);
+        return;
+      }
+    } else {
+      toast.success(`Topic "${topic.label}" deleted (draft)`);
+    }
     deleteTopic(topic.id);
-    toast.success(`Topic "${topic.label}" deleted`);
   }
 
   const isLoading = topicsQuery.isLoading;
@@ -84,6 +140,12 @@ export function Topics() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {apiAvailable && (
+            <span className="flex items-center gap-1 text-xs text-emerald-400">
+              <Zap size={11} />
+              Live
+            </span>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -154,9 +216,7 @@ export function Topics() {
                       {topic.tags.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {topic.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary">
-                              {tag}
-                            </Badge>
+                            <Badge key={tag} variant="secondary">{tag}</Badge>
                           ))}
                         </div>
                       )}
@@ -164,12 +224,7 @@ export function Topics() {
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge variant="outline">{itemCount} items</Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => openEdit(topic)}
-                      title="Edit topic"
-                    >
+                    <Button variant="ghost" size="icon-sm" onClick={() => openEdit(topic)} title="Edit topic">
                       <Pencil size={13} />
                     </Button>
                     <AlertDialog>
@@ -187,7 +242,8 @@ export function Topics() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete "{topic.label}"?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will remove the topic from your draft config.
+                            This will remove the topic from your{" "}
+                            {apiAvailable ? "live server and" : ""} draft config.
                             {feedCount > 0 && (
                               <> It will also remove {feedCount} feed{feedCount !== 1 ? "s" : ""} assigned to this topic.</>
                             )}
@@ -195,7 +251,7 @@ export function Topics() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(topic)}>
+                          <AlertDialogAction onClick={() => void handleDelete(topic)}>
                             Delete
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -214,7 +270,7 @@ export function Topics() {
         onOpenChange={setDialogOpen}
         topic={editingTopic}
         allTags={tags}
-        onSave={handleSave}
+        onSave={(t) => void handleSave(t)}
       />
     </div>
   );

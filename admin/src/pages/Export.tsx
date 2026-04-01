@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { Download, Copy, Check, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download, Copy, Check, AlertCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useConnectionStore } from "@/store/connection";
 import { useDraftStore } from "@/store/draft";
+import { apiExportConfig, apiHealthCheck } from "@/lib/api";
 
 function generateToml(
   serverUrl: string,
@@ -47,11 +48,27 @@ ${feedsToml || "# No feeds configured yet — add feeds in the Connectors page"}
 }
 
 export function Export() {
-  const { serverUrl } = useConnectionStore();
+  const { serverUrl, apiKey } = useConnectionStore();
   const { topics, feeds, isDirty } = useDraftStore();
   const [copied, setCopied] = useState(false);
+  const [apiAvailable, setApiAvailable] = useState(false);
+  const [liveToml, setLiveToml] = useState<string | null>(null);
 
-  const toml = generateToml(serverUrl, feeds, topics);
+  useEffect(() => {
+    if (apiKey) {
+      apiHealthCheck(apiKey).then((ok) => {
+        setApiAvailable(ok);
+        if (ok) {
+          apiExportConfig(apiKey).then(setLiveToml).catch(() => null);
+        }
+      });
+    } else {
+      setApiAvailable(false);
+      setLiveToml(null);
+    }
+  }, [apiKey]);
+
+  const toml = liveToml ?? generateToml(serverUrl, feeds, topics);
 
   async function copyToml() {
     try {
@@ -98,7 +115,15 @@ export function Export() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>ferrisletter.toml</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                ferrisletter.toml
+                {apiAvailable && (
+                  <span className="flex items-center gap-1 text-xs font-normal text-emerald-400">
+                    <Zap size={11} />
+                    Live from server
+                  </span>
+                )}
+              </CardTitle>
               <CardDescription>
                 {feeds.length} feed{feeds.length !== 1 ? "s" : ""} · {topics.length} topic{topics.length !== 1 ? "s" : ""} · RSS connector
               </CardDescription>

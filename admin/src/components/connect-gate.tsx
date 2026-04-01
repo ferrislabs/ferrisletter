@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Loader2 } from "lucide-react";
+import { Mail, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,18 +9,21 @@ import { queryClient } from "@/lib/query-client";
 
 /** Shown when the MCP server is not yet connected. */
 export function ConnectGate({ children }: { children: React.ReactNode }) {
-  const { status, serverUrl, error, setServerUrl, setStatus } = useConnectionStore();
+  const { status, serverUrl, apiKey, error, setServerUrl, setApiKey, setStatus } =
+    useConnectionStore();
   const [url, setUrl] = useState(serverUrl);
+  const [key, setKey] = useState(apiKey);
+  const [showAdvanced, setShowAdvanced] = useState(!!apiKey);
 
   async function handleConnect(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = url.trim().replace(/\/$/, "");
     setServerUrl(trimmed);
+    setApiKey(key.trim());
     setStatus("connecting");
     try {
       await connectMcp(trimmed);
       setStatus("connected");
-      // Invalidate all queries so pages refetch with the new connection.
       await queryClient.invalidateQueries();
       toast.success("Connected to server");
     } catch (err) {
@@ -69,6 +72,40 @@ export function ConnectGate({ children }: { children: React.ReactNode }) {
               autoFocus
             />
           </div>
+
+          {/* Advanced: API key */}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="flex items-center gap-1 text-xs text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] transition-colors"
+          >
+            {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            Admin API key
+            {key && (
+              <span className="ml-1 rounded-sm bg-[var(--color-accent-subtle)] px-1 text-[10px] text-[var(--color-accent)]">
+                set
+              </span>
+            )}
+          </button>
+
+          {showAdvanced && (
+            <div className="space-y-1.5">
+              <Input
+                id="api-key"
+                type="password"
+                placeholder="Leave blank if admin API is disabled"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+              />
+              <p className="text-[11px] text-[var(--color-text-dim)]">
+                Required when{" "}
+                <code className="font-mono text-[var(--color-text-dim)]">
+                  [admin] enabled = true
+                </code>{" "}
+                in your config. Without it, changes are draft-only.
+              </p>
+            </div>
+          )}
 
           <Button
             type="submit"

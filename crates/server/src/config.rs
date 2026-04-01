@@ -20,6 +20,38 @@ pub struct Config {
 
     #[serde(default)]
     pub connector: ConnectorConfig,
+
+    #[serde(default)]
+    pub admin: AdminConfig,
+}
+
+// --- Admin REST API ---
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AdminConfig {
+    /// Enable the management REST API.
+    #[serde(default)]
+    pub enabled: bool,
+    /// API key required in `Authorization: Bearer <key>` header.
+    #[serde(default)]
+    pub api_key: String,
+    /// Address to bind the admin HTTP server on.
+    #[serde(default = "default_admin_bind")]
+    pub bind_addr: String,
+}
+
+impl Default for AdminConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            api_key: String::new(),
+            bind_addr: default_admin_bind(),
+        }
+    }
+}
+
+fn default_admin_bind() -> String {
+    "127.0.0.1:3001".to_string()
 }
 
 // --- Transport ---
