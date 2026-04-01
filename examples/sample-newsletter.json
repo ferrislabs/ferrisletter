@@ -1,0 +1,55 @@
+{
+  "_comment": "Sample Ferrisletter data file. Use this as a template for your own newsletter.",
+  "_docs": "https://github.com/ferrislabs/ferrisletter/tree/main/docs/mcp-clients",
+  "topics": [
+    {
+      "id": "rust",
+      "label": "Rust",
+      "description": "News and releases from the Rust ecosystem",
+      "tags": ["rust", "programming", "systems"]
+    },
+    {
+      "id": "ai",
+      "label": "AI & LLMs",
+      "description": "Large language models, agents, and AI tooling",
+      "tags": ["ai", "llm", "agents", "mcp"]
+    },
+    {
+      "id": "open-source",
+      "label": "Open Source",
+      "description": "Notable open-source releases and community news",
+      "tags": ["open-source", "github", "community"]
+    }
+  ],
+  "items": [
+    {
+      "id": "example-item-1",
+      "topic_id": "rust",
+      "headline": "Your headline goes here",
+      "summary": "A one or two sentence summary of the item — shown in the compact view.",
+      "tags": ["rust", "example"],
+      "source": "example.com",
+      "published": "2024-03-01T10:00:00Z",
+      "body": "The full article text goes here. This is shown when a user asks to expand the item. It can be as long as you need — a few paragraphs is ideal for conversational use.",
+      "links": [
+        {
+          "url": "https://example.com/article",
+          "label": "Read the full article"
+        }
+      ],
+      "read_time": "3 min"
+    },
+    {
+      "id": "example-item-2",
+      "topic_id": "ai",
+      "headline": "Another example item",
+      "summary": "Short summary for the AI topic. Tags help with search.",
+      "tags": ["ai", "llm"],
+      "source": "anotherexample.com",
+      "published": "2024-02-28T08:00:00Z",
+      "body": "Full text of this item. Users can search for it by keyword, filter by tag, or ask for a recap since a given date.",
+      "links": [],
+      "read_time": "2 min"
+    }
+  ]
+}
