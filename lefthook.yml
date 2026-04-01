@@ -1,0 +1,25 @@
+# lefthook.yml — git hook configuration
+#
+# Setup (once per clone):
+#   brew install lefthook   # macOS
+#   lefthook install
+#
+# Docs: https://github.com/evilmartians/lefthook
+
+pre-push:
+  parallel: false
+  commands:
+    fmt:
+      glob: "**/*.rs"
+      run: cargo fmt --all -- --check
+      fail_text: "Run `cargo fmt --all` to fix formatting."
+
+    clippy:
+      glob: "**/*.rs"
+      run: cargo clippy --workspace -- -D warnings
+      fail_text: "Fix clippy warnings before pushing."
+
+    test:
+      glob: "**/*.rs"
+      run: cargo test --workspace
+      fail_text: "All tests must pass before pushing."
