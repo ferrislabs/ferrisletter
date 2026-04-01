@@ -7,14 +7,22 @@ let _client: Client | null = null;
 /**
  * Resolve the SSE URL to connect to.
  *
- * In dev mode (Vite dev server) we route through the same-origin proxy
- * (/sse → localhost:3000) to avoid CORS. In production the admin is served
- * from the same origin as the MCP server so no CORS is needed either.
+ * - Dev mode: always relative (/sse) — Vite dev proxy forwards to the MCP server.
+ * - Same hostname (e.g. vite preview on localhost, or co-hosted prod): relative —
+ *   lets the active proxy or direct routing handle it without cross-origin issues.
+ * - Different hostname (remote server): absolute URL.
  */
 function sseUrl(serverUrl: string): URL {
   if (import.meta.env.DEV) {
-    // Vite proxies /sse → MCP_SERVER — same origin, no CORS
     return new URL("/sse", window.location.origin);
+  }
+  try {
+    if (new URL(serverUrl).hostname === window.location.hostname) {
+      // Same host — relative URL works for both vite preview proxy and co-hosted prod.
+      return new URL("/sse", window.location.origin);
+    }
+  } catch {
+    // fall through
   }
   return new URL(`${serverUrl}/sse`);
 }
