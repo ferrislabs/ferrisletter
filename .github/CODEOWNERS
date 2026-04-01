@@ -1,0 +1,12 @@
+# CODEOWNERS
+# Each line is a file pattern followed by one or more owners.
+# Order matters — the last matching rule takes precedence.
+
+# Default owner for everything
+* @luisRubiera
+
+# Connector SDK — changes here affect all connectors and the server
+/crates/connector/ @luisRubiera
+
+# Website
+/website/ @luisRubiera
