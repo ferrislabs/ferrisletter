@@ -50,3 +50,14 @@ path = "examples/sample-newsletter.json"
 # topic_description = "Weekly Rust newsletter"
 # topic_tags  = ["rust", "community"]
 # url         = "https://this-week-in-rust.org/atom.xml"
+
+# --------------------------------------------------------------------------
+# Admin REST API (optional)
+# --------------------------------------------------------------------------
+# Enables live topic/feed management without restarting the server.
+# The API listens on a separate port from the MCP SSE transport.
+#
+# [admin]
+# enabled   = true
+# api_key   = "change-me-please"   # set a strong secret; leave blank to disable auth
+# bind_addr = "127.0.0.1:3001"    # address for the REST API (default: 127.0.0.1:3001)

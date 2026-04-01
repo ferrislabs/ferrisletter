@@ -1,3 +1,4 @@
+mod api;
 mod config;
 mod server;
 
@@ -10,7 +11,9 @@ use ferrisletter_connector_static::StaticConnector;
 use rmcp::ServiceExt;
 use rmcp::transport::stdio;
 use server::FerrislletterServer;
+use tokio::sync::RwLock;
 
+use crate::api::{ApiState, ConnectorHandle, FeedRecord, TopicRecord};
 use crate::config::{ConnectorConfig, TransportMode};
 
 /// Embedded sample data — used when no config or data file is provided.
@@ -32,74 +35,61 @@ async fn main() -> anyhow::Result<()> {
     // `--config <path>` CLI arg takes precedence over everything else.
     let cli_config: Option<String> = std::env::args().skip_while(|a| a != "--config").nth(1);
 
-    let cfg = config::load(cli_config.as_deref()).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let cfg = config::load(cli_config.as_deref())
+        .map_err(|e| anyhow::anyhow!("{e}"))?
+        .unwrap_or_default();
 
-    // Build connector from config.
-    let connector: Arc<BoxedConnector> = match cfg.as_ref().map(|c| &c.connector) {
-        Some(ConnectorConfig::Static { path }) if !path.as_os_str().is_empty() => {
-            tracing::info!(path = %path.display(), "loading static connector");
-            Arc::new(BoxedConnector::new(
-                StaticConnector::from_file(path)
-                    .map_err(|e| anyhow::anyhow!("failed to load '{}': {e}", path.display()))?,
-            ))
-        }
-        Some(ConnectorConfig::Rss { feeds }) => {
-            tracing::info!(feeds = feeds.len(), "loading RSS connector");
-            let rss_feeds = feeds
-                .iter()
-                .map(|f| RssFeedConfig {
-                    topic_id: f.topic_id.clone(),
-                    topic_label: f.topic_label.clone(),
-                    topic_description: f.topic_description.clone(),
-                    topic_tags: f.topic_tags.clone(),
-                    url: f.url.clone(),
-                })
-                .collect();
-            Arc::new(BoxedConnector::new(RssConnector::new(rss_feeds)))
-        }
-        // No config or empty static path — fall back to env var or embedded sample.
-        _ => match std::env::var("FERRISLETTER_DATA") {
-            Ok(path) => {
-                tracing::info!(path, "loading static connector from FERRISLETTER_DATA");
-                Arc::new(BoxedConnector::new(
-                    StaticConnector::from_file(&path)
-                        .map_err(|e| anyhow::anyhow!("failed to load '{path}': {e}"))?,
-                ))
-            }
-            Err(_) => {
-                tracing::info!("using embedded sample data");
-                Arc::new(BoxedConnector::new(
-                    StaticConnector::from_json(SAMPLE_DATA)
-                        .expect("embedded sample data must be valid"),
-                ))
-            }
-        },
-    };
+    // Seed the API state from the config so the REST API reflects the initial feeds.
+    let (initial_topics, initial_feeds) = extract_api_records(&cfg.connector);
 
-    let server = FerrislletterServer::new(connector);
+    // Build the initial connector.
+    let initial_connector: Arc<BoxedConnector> =
+        build_connector(&cfg.connector, cli_config.as_deref()).await?;
 
-    // Start transport.
-    let mode = cfg
-        .map(|c| c.transport.mode)
-        .unwrap_or(TransportMode::Stdio);
+    // Wrap in a hot-swappable handle.
+    let connector_handle: ConnectorHandle = Arc::new(RwLock::new(initial_connector));
 
-    match mode {
+    // Build the API state (shared between REST API and used to rebuild the connector).
+    let api_state = ApiState::new(
+        initial_topics,
+        initial_feeds,
+        connector_handle.clone(),
+        cfg.admin.api_key.clone(),
+    );
+
+    // Spawn the admin REST API if enabled.
+    if cfg.admin.enabled {
+        let addr: SocketAddr = cfg
+            .admin
+            .bind_addr
+            .parse()
+            .map_err(|_| anyhow::anyhow!("invalid admin bind_addr: {}", cfg.admin.bind_addr))?;
+        let state = api_state.clone();
+        tokio::spawn(async move { api::serve(state, addr).await });
+        tracing::info!(
+            addr = %cfg.admin.bind_addr,
+            auth = !cfg.admin.api_key.is_empty(),
+            "admin REST API enabled"
+        );
+    }
+
+    let mcp_server = FerrislletterServer::new(connector_handle);
+
+    // Start MCP transport.
+    match cfg.transport.mode {
         TransportMode::Sse => {
-            let cfg2 = config::load(cli_config.as_deref())
-                .map_err(|e| anyhow::anyhow!("{e}"))?
-                .unwrap_or_default();
             let addr: SocketAddr =
-                format!("{}:{}", cfg2.transport.host, cfg2.transport.port).parse()?;
-            tracing::info!(%addr, "serving over SSE");
+                format!("{}:{}", cfg.transport.host, cfg.transport.port).parse()?;
+            tracing::info!(%addr, "serving MCP over SSE");
             let ct = rmcp::transport::sse_server::SseServer::serve(addr)
                 .await?
-                .with_service(move || server.clone());
+                .with_service(move || mcp_server.clone());
             tokio::signal::ctrl_c().await?;
             ct.cancel();
         }
         TransportMode::Stdio => {
-            tracing::info!("serving over stdio");
-            let service = server
+            tracing::info!("serving MCP over stdio");
+            let service = mcp_server
                 .serve(stdio())
                 .await
                 .inspect_err(|e| tracing::error!("failed to start server: {e}"))?;
@@ -111,4 +101,83 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Extract initial TopicRecord + FeedRecord lists from the config connector.
+fn extract_api_records(connector: &ConnectorConfig) -> (Vec<TopicRecord>, Vec<FeedRecord>) {
+    match connector {
+        ConnectorConfig::Rss { feeds } => {
+            // Deduplicate topics by id (multiple feeds can share a topic).
+            let mut topics: Vec<TopicRecord> = Vec::new();
+            let mut feed_records: Vec<FeedRecord> = Vec::new();
+
+            for f in feeds {
+                if !topics.iter().any(|t: &TopicRecord| t.id == f.topic_id) {
+                    topics.push(TopicRecord {
+                        id: f.topic_id.clone(),
+                        label: f.topic_label.clone(),
+                        description: f.topic_description.clone(),
+                        tags: f.topic_tags.clone(),
+                    });
+                }
+                feed_records.push(FeedRecord {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    topic_id: f.topic_id.clone(),
+                    url: f.url.clone(),
+                });
+            }
+            (topics, feed_records)
+        }
+        _ => (Vec::new(), Vec::new()),
+    }
+}
+
+/// Build the initial BoxedConnector from config.
+async fn build_connector(
+    connector_cfg: &ConnectorConfig,
+    cli_config: Option<&str>,
+) -> anyhow::Result<Arc<BoxedConnector>> {
+    match connector_cfg {
+        ConnectorConfig::Static { path } if !path.as_os_str().is_empty() => {
+            tracing::info!(path = %path.display(), "loading static connector");
+            Ok(Arc::new(BoxedConnector::new(
+                StaticConnector::from_file(path)
+                    .map_err(|e| anyhow::anyhow!("failed to load '{}': {e}", path.display()))?,
+            )))
+        }
+        ConnectorConfig::Rss { feeds } => {
+            tracing::info!(feeds = feeds.len(), "loading RSS connector");
+            let rss_feeds = feeds
+                .iter()
+                .map(|f| RssFeedConfig {
+                    topic_id: f.topic_id.clone(),
+                    topic_label: f.topic_label.clone(),
+                    topic_description: f.topic_description.clone(),
+                    topic_tags: f.topic_tags.clone(),
+                    url: f.url.clone(),
+                })
+                .collect();
+            Ok(Arc::new(BoxedConnector::new(RssConnector::new(rss_feeds))))
+        }
+        _ => {
+            // No config or empty static path — try env var then embedded sample.
+            let _ = cli_config; // unused in this branch
+            match std::env::var("FERRISLETTER_DATA") {
+                Ok(path) => {
+                    tracing::info!(path, "loading static connector from FERRISLETTER_DATA");
+                    Ok(Arc::new(BoxedConnector::new(
+                        StaticConnector::from_file(&path)
+                            .map_err(|e| anyhow::anyhow!("failed to load '{path}': {e}"))?,
+                    )))
+                }
+                Err(_) => {
+                    tracing::info!("using embedded sample data");
+                    Ok(Arc::new(BoxedConnector::new(
+                        StaticConnector::from_json(SAMPLE_DATA)
+                            .expect("embedded sample data must be valid"),
+                    )))
+                }
+            }
+        }
+    }
 }
