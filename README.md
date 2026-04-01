@@ -1,5 +1,9 @@
 # Ferrisletter
 
+[![CI](https://github.com/ferrislabs/ferrisletter/actions/workflows/ci.yml/badge.svg)](https://github.com/ferrislabs/ferrisletter/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust: 2024 edition](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://doc.rust-lang.org/edition-guide/rust-2024/)
+
 **Newsletters that talk back.**
 
 A conversational newsletter platform powered by [MCP](https://modelcontextprotocol.io). Your LLM delivers the news — you just talk back. Built in Rust. Open source.
