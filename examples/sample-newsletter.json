@@ -29,7 +29,7 @@
       "summary": "A one or two sentence summary of the item — shown in the compact view.",
       "tags": ["rust", "example"],
       "source": "example.com",
-      "published": "2024-03-01T10:00:00Z",
+      "published": "2026-04-01T10:00:00Z",
       "body": "The full article text goes here. This is shown when a user asks to expand the item. It can be as long as you need — a few paragraphs is ideal for conversational use.",
       "links": [
         {
@@ -46,7 +46,7 @@
       "summary": "Short summary for the AI topic. Tags help with search.",
       "tags": ["ai", "llm"],
       "source": "anotherexample.com",
-      "published": "2024-02-28T08:00:00Z",
+      "published": "2026-03-30T08:00:00Z",
       "body": "Full text of this item. Users can search for it by keyword, filter by tag, or ask for a recap since a given date.",
       "links": [],
       "read_time": "2 min"

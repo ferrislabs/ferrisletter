@@ -20,5 +20,8 @@ export function formatRelative(iso: string): string {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  // Older than 30 days — show the actual date, counting days is not useful
+  return formatDate(iso);
 }
