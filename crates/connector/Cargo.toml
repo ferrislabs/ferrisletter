@@ -9,5 +9,4 @@ repository.workspace = true
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-async-trait = "0.1"
 thiserror = "2"

@@ -4,6 +4,8 @@
 //! Third-party connector authors should depend on this crate and implement the trait
 //! to integrate their content source with Ferrisletter.
 
+use std::future::Future;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -11,30 +13,35 @@ mod error;
 pub use error::ConnectorError;
 
 /// A content source that provides news items to Ferrisletter.
-#[async_trait::async_trait]
 pub trait Connector: Send + Sync {
     /// Returns the available content categories.
-    async fn list_topics(&self) -> Result<Vec<Topic>, ConnectorError>;
+    fn list_topics(&self) -> impl Future<Output = Result<Vec<Topic>, ConnectorError>> + Send;
 
     /// Returns recent items, filtered by user preferences.
-    async fn get_latest_items(&self, prefs: &UserPrefs) -> Result<Vec<Item>, ConnectorError>;
+    fn get_latest_items(
+        &self,
+        prefs: &UserPrefs,
+    ) -> impl Future<Output = Result<Vec<Item>, ConnectorError>> + Send;
 
     /// Returns the full content for a specific item.
-    async fn get_item_detail(&self, id: &str) -> Result<ItemDetail, ConnectorError>;
+    fn get_item_detail(
+        &self,
+        id: &str,
+    ) -> impl Future<Output = Result<ItemDetail, ConnectorError>> + Send;
 
     /// Finds items matching a query across all past content.
-    async fn search(
+    fn search(
         &self,
         query: &str,
         filters: &SearchFilters,
-    ) -> Result<Vec<Item>, ConnectorError>;
+    ) -> impl Future<Output = Result<Vec<Item>, ConnectorError>> + Send;
 
     /// Returns a summary of items since a given point in time.
-    async fn get_recap(
+    fn get_recap(
         &self,
         since: DateTime<Utc>,
         prefs: &UserPrefs,
-    ) -> Result<Vec<Item>, ConnectorError>;
+    ) -> impl Future<Output = Result<Vec<Item>, ConnectorError>> + Send;
 }
 
 /// A content category within a newsletter.
