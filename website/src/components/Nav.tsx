@@ -31,6 +31,14 @@ export default function Nav() {
             Stack
           </a>
           <a
+            href="https://discord.gg/a5mynqNgtU"
+            target="_blank"
+            rel="noopener"
+            className="text-[var(--color-text-muted)] text-sm font-medium hover:text-[var(--color-text)] transition-colors hidden sm:inline"
+          >
+            Discord
+          </a>
+          <a
             href="https://github.com/ferrislabs/ferrisletter"
             target="_blank"
             rel="noopener"

@@ -29,16 +29,26 @@ export default function CTA() {
               is a conversation.
             </h2>
             <p className="text-base text-[var(--color-text-muted)] max-w-[480px] mx-auto mb-8 leading-relaxed relative">
-              Ferrisletter is open source and under active development. Star the repo, follow the progress, or contribute.
+              Ferrisletter is open source and under active development. Star the repo, join the community, or contribute.
             </p>
-            <a
-              href="https://github.com/ferrislabs/ferrisletter"
-              target="_blank"
-              rel="noopener"
-              className="inline-flex items-center gap-2 px-10 py-3.5 bg-[var(--color-accent)] text-white rounded-xl text-base font-semibold hover:bg-[var(--color-accent-hover)] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(109,90,255,0.3)] transition-all relative"
-            >
-              Star on GitHub
-            </a>
+            <div className="flex gap-4 justify-center flex-wrap relative">
+              <a
+                href="https://github.com/ferrislabs/ferrisletter"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-2 px-10 py-3.5 bg-[var(--color-accent)] text-white rounded-xl text-base font-semibold hover:bg-[var(--color-accent-hover)] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(109,90,255,0.3)] transition-all"
+              >
+                Star on GitHub
+              </a>
+              <a
+                href="https://discord.gg/a5mynqNgtU"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-2 px-10 py-3.5 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl text-base font-semibold hover:border-[var(--color-border-hover)] hover:-translate-y-0.5 transition-all"
+              >
+                Join Discord
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -49,9 +59,13 @@ export default function CTA() {
             <span className="text-[var(--color-accent)]">&#9671;</span>
             <span>ferrisletter</span>
           </div>
-          <p className="text-xs text-[var(--color-text-dim)]">
-            Open source &middot; MCP-native &middot; Built with Rust
-          </p>
+          <div className="flex items-center gap-4">
+            <a href="https://github.com/ferrislabs/ferrisletter" target="_blank" rel="noopener" className="text-xs text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors">GitHub</a>
+            <span className="text-[var(--color-border)]">&middot;</span>
+            <a href="https://discord.gg/a5mynqNgtU" target="_blank" rel="noopener" className="text-xs text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors">Discord</a>
+            <span className="text-[var(--color-border)]">&middot;</span>
+            <span className="text-xs text-[var(--color-text-dim)]">Built with Rust</span>
+          </div>
         </div>
       </footer>
     </>
