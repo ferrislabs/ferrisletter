@@ -41,6 +41,24 @@ ferrisletter/
 | Auth | AuthZEN + FerrisKey |
 | Website | Astro 5 + Explainer |
 
+## Quickstart
+
+```bash
+# Build the server
+cargo build --release -p ferrisletter-server
+
+# Run it (uses embedded sample data)
+./target/release/ferrisletter-server
+```
+
+Point your MCP client at the binary. See the setup guides:
+
+- [Claude Desktop](docs/mcp-clients/claude-desktop.md)
+- [Cursor](docs/mcp-clients/cursor.md)
+- [Zed](docs/mcp-clients/zed.md)
+
+To use your own content, set `FERRISLETTER_DATA` to a JSON file — see [`examples/sample-newsletter.json`](examples/sample-newsletter.json) for the format.
+
 ## Status
 
 Early development — proof of concept.
