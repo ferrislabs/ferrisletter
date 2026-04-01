@@ -51,17 +51,54 @@ ferrisletter/
 # Build the server
 cargo build --release -p ferrisletter-server
 
-# Run it (uses embedded sample data)
-./target/release/ferrisletter-server
+# Run with the demo RSS config (stdio transport)
+./target/release/ferrisletter-server --config examples/ferrisletter-demo.toml
 ```
 
-Point your MCP client at the binary. See the setup guides:
+## Demo — Claude Desktop in 1 command
 
-- [Claude Desktop](docs/mcp-clients/claude-desktop.md)
-- [Cursor](docs/mcp-clients/cursor.md)
-- [Zed](docs/mcp-clients/zed.md)
+The fastest way to see Ferrisletter working end-to-end with real RSS feeds:
 
-To use your own content, set `FERRISLETTER_DATA` to a JSON file — see [`examples/sample-newsletter.json`](examples/sample-newsletter.json) for the format.
+```bash
+./scripts/setup-claude-desktop.sh
+```
+
+This builds the release binary and wires it into Claude Desktop's MCP config automatically. Restart Claude Desktop, then try:
+
+- *"What's new in AI this week?"*
+- *"Catch me up on Rust since last Monday"*
+- *"Find anything about agents or MCP"*
+- *"Summarise the top open-source news"*
+
+The demo config ([`examples/ferrisletter-demo.toml`](examples/ferrisletter-demo.toml)) includes:
+
+| Topic | Feeds |
+|-------|-------|
+| AI & LLMs | Simon Willison's blog · HN filtered (LLM/Claude/OpenAI, ≥50 pts) |
+| Rust | blog.rust-lang.org · This Week in Rust |
+| Open Source | GitHub Blog |
+
+### Test it in Claude Code
+
+If you already have the repo open in Claude Code, the MCP tools are available immediately without restarting anything:
+
+```
+ferrisletter_list_topics     — discover available topics
+ferrisletter_get_latest      — headlines + summaries
+ferrisletter_search          — keyword search across all feeds
+ferrisletter_recap           — time-range digest (e.g. "since last Monday")
+ferrisletter_get_item        — full text of a single item
+```
+
+### Custom config
+
+Point the server at your own TOML:
+
+```bash
+./scripts/setup-claude-desktop.sh --config /path/to/my-feeds.toml
+```
+
+See [`examples/ferrisletter-demo.toml`](examples/ferrisletter-demo.toml) for the format.
 
 ## Status
 
