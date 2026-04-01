@@ -1,0 +1,14 @@
+services:
+  ferrisletter:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount your config file and data directory into the container.
+      # Adjust the host paths to match your setup.
+      - ./ferrisletter.toml:/config/ferrisletter.toml:ro
+      - ./examples:/data:ro
+    environment:
+      FERRISLETTER_CONFIG: /config/ferrisletter.toml
+      # RUST_LOG: info
+    restart: unless-stopped

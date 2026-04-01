@@ -1,0 +1,8 @@
+target/
+website/node_modules/
+website/.astro/
+website/dist/
+.git/
+.github/
+docs/
+*.md
