@@ -1,0 +1,52 @@
+# ferrisletter.toml — example configuration file
+#
+# Run with:
+#   ferrisletter-server --config ferrisletter.toml
+#
+# Or set the path via environment variable:
+#   FERRISLETTER_CONFIG=/path/to/ferrisletter.toml ferrisletter-server
+
+# --------------------------------------------------------------------------
+# Transport
+# --------------------------------------------------------------------------
+
+[transport]
+# "stdio"  — communicate over stdin/stdout (default, works with Claude Desktop,
+#             Cursor, Zed, and any MCP client that spawns a child process)
+# "sse"    — serve over HTTP using Server-Sent Events (for web-based clients)
+mode = "stdio"
+
+# Only used when mode = "sse"
+# host = "127.0.0.1"
+# port = 3000
+
+# --------------------------------------------------------------------------
+# Connector — choose one
+# --------------------------------------------------------------------------
+
+# Option A: static JSON file
+[connector]
+type = "static"
+path = "examples/sample-newsletter.json"
+
+# --------------------------------------------------------------------------
+# Option B: one or more RSS/Atom feeds (comment out the static block above
+# and uncomment this section)
+# --------------------------------------------------------------------------
+
+# [connector]
+# type = "rss"
+#
+# [[connector.feeds]]
+# topic_id    = "rust"
+# topic_label = "Rust"
+# topic_description = "News from the Rust ecosystem"
+# topic_tags  = ["rust", "programming"]
+# url         = "https://blog.rust-lang.org/feed.xml"
+#
+# [[connector.feeds]]
+# topic_id    = "this-week-in-rust"
+# topic_label = "This Week in Rust"
+# topic_description = "Weekly Rust newsletter"
+# topic_tags  = ["rust", "community"]
+# url         = "https://this-week-in-rust.org/atom.xml"
