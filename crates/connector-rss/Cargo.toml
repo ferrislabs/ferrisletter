@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 ferrisletter-connector = { path = "../connector" }
-async-trait = "0.1"
 reqwest = { version = "0.12", features = ["json"] }
 feed-rs = "2"
 tokio = { version = "1", features = ["full"] }

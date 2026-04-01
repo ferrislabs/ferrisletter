@@ -34,7 +34,6 @@
 
 use std::path::Path;
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use ferrisletter_connector::{
     Connector, ConnectorError, Item, ItemDetail, SearchFilters, Topic, UserPrefs,
@@ -82,7 +81,6 @@ impl StaticConnector {
     }
 }
 
-#[async_trait]
 impl Connector for StaticConnector {
     async fn list_topics(&self) -> Result<Vec<Topic>, ConnectorError> {
         Ok(self.data.topics.clone())
