@@ -8,9 +8,13 @@ repository.workspace = true
 
 [dependencies]
 ferrisletter-connector = { path = "../connector" }
-rmcp = { version = "0.1", features = ["server", "transport-sse"] }
-tokio = { version = "1", features = ["full"] }
+ferrisletter-connector-static = { path = "../connector-static" }
+rmcp = { version = "0.1", features = ["server", "transport-io", "transport-sse-server"] }
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+schemars = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
