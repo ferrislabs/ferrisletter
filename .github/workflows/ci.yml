@@ -45,6 +45,24 @@ jobs:
         working-directory: website
         run: npm run build
 
+  admin:
+    name: Admin UI build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        working-directory: admin
+        run: npm ci
+      - name: Typecheck
+        working-directory: admin
+        run: npm run typecheck
+      - name: Build
+        working-directory: admin
+        run: npm run build
+
   ui:
     name: MCP App UI build
     runs-on: ubuntu-latest

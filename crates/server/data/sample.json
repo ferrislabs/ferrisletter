@@ -27,7 +27,7 @@
       "summary": "The Rust 2024 edition ships with native async fn in traits (AFIT), improved ergonomics for closures, and a cleaner approach to lifetime capture in return-position impl trait.",
       "tags": ["rust", "edition", "afit"],
       "source": "blog.rust-lang.org",
-      "published": "2024-02-15T10:00:00Z",
+      "published": "2026-03-28T10:00:00Z",
       "body": "The Rust 2024 edition is now stable. The headline feature is async fn in traits (AFIT) — you can now write `async fn` directly in trait definitions without the async-trait crate. Return-position impl Trait (RPIT) in traits also captures lifetimes correctly by default. Other improvements include gen blocks for iterator authoring and refined closure capture semantics.",
       "links": [
         { "url": "https://blog.rust-lang.org/2025/02/20/Rust-1.85.0.html", "label": "Rust 1.85 release notes" }
@@ -41,7 +41,7 @@
       "summary": "The Model Context Protocol now has an official Rust SDK. rmcp provides server and client implementations with proc-macro ergonomics for registering tools.",
       "tags": ["rust", "mcp", "sdk"],
       "source": "github.com/modelcontextprotocol/rust-sdk",
-      "published": "2024-03-01T08:00:00Z",
+      "published": "2026-04-01T08:00:00Z",
       "body": "rmcp is the official Rust implementation of the Model Context Protocol. It ships with a `#[tool]` proc-macro for zero-boilerplate tool registration, support for stdio and SSE transports, and full async/await support via Tokio. The SDK mirrors the patterns established by the TypeScript and Python SDKs while feeling idiomatic to Rust.",
       "links": [
         { "url": "https://github.com/modelcontextprotocol/rust-sdk", "label": "GitHub" },
@@ -56,7 +56,7 @@
       "summary": "Anthropic open-sources the Model Context Protocol — a standard for connecting LLMs to tools, data sources, and external services. Major IDE and client support announced at launch.",
       "tags": ["mcp", "anthropic", "protocol", "llm"],
       "source": "anthropic.com",
-      "published": "2024-01-15T14:00:00Z",
+      "published": "2026-03-25T14:00:00Z",
       "body": "The Model Context Protocol (MCP) defines how LLM clients discover and call tools exposed by servers. It supports three primitives: tools (callable functions), resources (data the model can read), and prompts (reusable prompt templates). The protocol uses JSON-RPC over stdio or SSE. At launch, Claude Desktop, Cursor, and Zed all ship with MCP support.",
       "links": [
         { "url": "https://modelcontextprotocol.io", "label": "MCP specification" },
@@ -71,7 +71,7 @@
       "summary": "Ferrislabs ships Ferrisletter — an open-source MCP server that turns newsletters into chat-native experiences. Subscribe to topics, ask for headlines, and expand what interests you.",
       "tags": ["ferrisletter", "mcp", "newsletter", "open-source"],
       "source": "github.com/ferrislabs/ferrisletter",
-      "published": "2024-03-10T09:00:00Z",
+      "published": "2026-03-31T09:00:00Z",
       "body": "Ferrisletter reimagines the newsletter as a conversation. Instead of reading a wall of text, your LLM client delivers compact headlines via the MCP protocol. You expand what interests you, skip the rest, and ask for recaps when you've been away. Built in Rust with rmcp, the connector SDK is open source and anyone can write a connector for their own content source.",
       "links": [
         { "url": "https://github.com/ferrislabs/ferrisletter", "label": "GitHub" },
@@ -86,7 +86,7 @@
       "summary": "Tokio 1.40 adds per-task instrumentation for diagnosing async runtimes in production, alongside performance improvements to the timer wheel.",
       "tags": ["rust", "tokio", "async"],
       "source": "tokio.rs",
-      "published": "2024-02-01T11:00:00Z",
+      "published": "2026-03-29T11:00:00Z",
       "body": "Tokio 1.40 introduces task metrics — you can now instrument individual async tasks to measure poll time, schedule delay, and resource usage. This makes it much easier to find hot tasks and unexpected blocking in production systems. The timer wheel also received a significant rewrite that reduces allocation pressure for workloads with many short-lived timers.",
       "links": [
         { "url": "https://tokio.rs/blog/2024-02-tokio-1-40", "label": "Release post" }
