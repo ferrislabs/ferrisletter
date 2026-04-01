@@ -10,6 +10,24 @@
 set -euo pipefail
 
 # --------------------------------------------------------------------------
+# Helper — must be defined before it is called
+# --------------------------------------------------------------------------
+
+print_manual_config() {
+  echo ""
+  echo "Add this to your claude_desktop_config.json:"
+  echo ""
+  echo "{"
+  echo "  \"mcpServers\": {"
+  echo "    \"ferrisletter\": {"
+  echo "      \"command\": \"$BINARY\","
+  echo "      \"args\": [\"--config\", \"$FERRISLETTER_CONFIG\"]"
+  echo "    }"
+  echo "  }"
+  echo "}"
+}
+
+# --------------------------------------------------------------------------
 # Resolve paths
 # --------------------------------------------------------------------------
 
@@ -102,17 +120,3 @@ echo "    \"What's new in AI this week?\""
 echo "    \"Catch me up on Rust since last Monday\""
 echo "    \"Find anything about agents or MCP\""
 echo ""
-
-print_manual_config() {
-  echo ""
-  echo "Add this to your claude_desktop_config.json:"
-  echo ""
-  echo "{"
-  echo "  \"mcpServers\": {"
-  echo "    \"ferrisletter\": {"
-  echo "      \"command\": \"$BINARY\","
-  echo "      \"args\": [\"--config\", \"$FERRISLETTER_CONFIG\"]"
-  echo "    }"
-  echo "  }"
-  echo "}"
-}
