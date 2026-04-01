@@ -78,7 +78,7 @@ export function Dashboard() {
         >
           <RefreshCw
             size={13}
-            className={topicsQuery.isFetching ? "animate-spin" : ""}
+            className={topicsQuery.isFetching || itemsQuery.isFetching ? "animate-spin" : ""}
           />
           Refresh
         </Button>
@@ -102,7 +102,7 @@ export function Dashboard() {
           label="Latest item"
           value={latestItem ? formatRelative(latestItem.published) : "—"}
           icon={Rss}
-          description={latestItem?.headline.slice(0, 50).concat("…") ?? "No items yet"}
+          description={latestItem?.headline?.slice(0, 60) ?? "No items yet"}
         />
       </div>
 

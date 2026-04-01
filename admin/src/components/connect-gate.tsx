@@ -9,7 +9,7 @@ import { queryClient } from "@/lib/query-client";
 
 /** Shown when the MCP server is not yet connected. */
 export function ConnectGate({ children }: { children: React.ReactNode }) {
-  const { status, serverUrl, setServerUrl, setStatus } = useConnectionStore();
+  const { status, serverUrl, error, setServerUrl, setStatus } = useConnectionStore();
   const [url, setUrl] = useState(serverUrl);
 
   async function handleConnect(e: React.FormEvent) {
@@ -86,9 +86,16 @@ export function ConnectGate({ children }: { children: React.ReactNode }) {
           </Button>
 
           {status === "error" && (
-            <p className="text-xs text-[var(--color-destructive)] text-center">
-              Could not connect. Make sure the server is running in SSE mode.
-            </p>
+            <div className="rounded-md bg-[var(--color-destructive)]/10 border border-[var(--color-destructive)]/20 px-3 py-2 text-center">
+              <p className="text-xs text-[var(--color-destructive)] font-medium">
+                Connection failed
+              </p>
+              {error && (
+                <p className="mt-0.5 text-[11px] text-[var(--color-destructive)]/80 font-mono break-all">
+                  {error}
+                </p>
+              )}
+            </div>
           )}
         </form>
 

@@ -53,10 +53,14 @@ export function Export() {
   const toml = generateToml(serverUrl, topics);
 
   async function copyToml() {
-    await navigator.clipboard.writeText(toml);
-    setCopied(true);
-    toast.success("Copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(toml);
+      setCopied(true);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not copy — try selecting the text manually");
+    }
   }
 
   function downloadToml() {
