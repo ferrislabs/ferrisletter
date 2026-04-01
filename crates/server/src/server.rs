@@ -11,8 +11,9 @@ use rmcp::{
         ReadResourceRequestParam, ReadResourceResult, ResourceContents, ResourcesCapability,
         ServerCapabilities, ServerInfo, ToolsCapability,
     },
-    schemars, tool,
+    schemars,
     service::RequestContext,
+    tool,
 };
 use serde::Deserialize;
 
@@ -211,10 +212,10 @@ impl ServerHandler for FerrislletterServer {
     fn get_info(&self) -> ServerInfo {
         let capabilities = ServerCapabilities {
             tools: Some(ToolsCapability { list_changed: None }),
-            resources: self
-                .ui_url
-                .as_ref()
-                .map(|_| ResourcesCapability { list_changed: None, subscribe: None }),
+            resources: self.ui_url.as_ref().map(|_| ResourcesCapability {
+                list_changed: None,
+                subscribe: None,
+            }),
             ..Default::default()
         };
         ServerInfo {

@@ -1,6 +1,10 @@
 //! Static HTTP server that serves the embedded MCP App UI bundle.
 
-use axum::{Router, response::{Html, IntoResponse}, routing::get};
+use axum::{
+    Router,
+    response::{Html, IntoResponse},
+    routing::get,
+};
 use tower_http::cors::{Any, CorsLayer};
 
 /// The single-file UI bundle produced by `npm run build` in `ui/`.
@@ -17,9 +21,7 @@ pub fn router() -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    Router::new()
-        .route("/", get(serve_index))
-        .layer(cors)
+    Router::new().route("/", get(serve_index)).layer(cors)
 }
 
 pub async fn serve(bind_addr: &str) -> anyhow::Result<()> {
