@@ -18,14 +18,16 @@ export default defineConfig({
     // The admin connects to window.location.origin in dev mode and Vite
     // transparently forwards /sse and /message to the MCP server.
     proxy: {
-      "/sse": {
-        target: MCP_SERVER,
-        changeOrigin: true,
-      },
-      "/message": {
-        target: MCP_SERVER,
-        changeOrigin: true,
-      },
+      "/sse": { target: MCP_SERVER, changeOrigin: true },
+      "/message": { target: MCP_SERVER, changeOrigin: true },
+    },
+  },
+  preview: {
+    port: 5174,
+    // Same proxy as dev so `vite preview` works locally without CORS issues.
+    proxy: {
+      "/sse": { target: MCP_SERVER, changeOrigin: true },
+      "/message": { target: MCP_SERVER, changeOrigin: true },
     },
   },
   build: {
