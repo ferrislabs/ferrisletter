@@ -255,7 +255,7 @@ export function CompactIssue({
       : null;
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-bg-card)] rounded-lg border border-[var(--color-border)] overflow-hidden">
+    <div className="flex flex-col bg-[var(--color-bg-card)] rounded-lg border border-[var(--color-border)] overflow-hidden">
       {/* header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] shrink-0">
         <div>
@@ -300,7 +300,7 @@ export function CompactIssue({
       />
 
       {/* scrollable content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="overflow-y-auto max-h-[600px]">
         {isDemo && <DemoBanner />}
 
         {visibleTopics.map((topic) => (

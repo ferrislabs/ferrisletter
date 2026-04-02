@@ -23,9 +23,17 @@ export function useMcpApp(): App | null {
 // ── Tool result parsing ─────────────────────────────────────────────────────
 
 function extractJson(result: CallToolResult): unknown {
-  const block = result.content?.find((c) => c.type === "text");
-  if (!block || block.type !== "text") throw new Error("no text content");
-  return JSON.parse(block.text);
+  // When UI is enabled the server returns [note, json] — try each text block.
+  const textBlocks = result.content?.filter((c) => c.type === "text") ?? [];
+  for (const block of textBlocks) {
+    if (block.type !== "text") continue;
+    try {
+      return JSON.parse(block.text);
+    } catch {
+      // not JSON, skip (e.g. the human-readable note)
+    }
+  }
+  throw new Error("no JSON content in tool result");
 }
 
 /** Infer the kind of data from the shape of the parsed JSON. */

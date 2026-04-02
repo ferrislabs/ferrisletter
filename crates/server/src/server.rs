@@ -77,9 +77,21 @@ fn ui_tool_meta() -> Meta {
     meta
 }
 
+/// Wrap serialised JSON in a successful `CallToolResult` — no UI metadata.
+fn tool_ok_text(json: String) -> CallToolResult {
+    CallToolResult::success(vec![Content::text(json)])
+}
+
 /// Wrap serialised JSON in a successful `CallToolResult` with UI metadata.
-fn tool_ok(json: String) -> CallToolResult {
-    CallToolResult::success(vec![Content::text(json)]).with_meta(Some(ui_result_meta()))
+/// The note tells the model the data is already rendered in the UI panel;
+/// the JSON is in a separate content block so the app can still parse it.
+fn tool_ok_ui(json: String, item_count: usize, label: &str) -> CallToolResult {
+    let note = format!(
+        "Rendered in companion UI — {item_count} {label}. \
+         Do NOT repeat or summarise individual items to the user."
+    );
+    CallToolResult::success(vec![Content::text(note), Content::text(json)])
+        .with_meta(Some(ui_result_meta()))
 }
 
 // --- Tool parameter types ---
@@ -140,9 +152,13 @@ impl FerrislletterServer {
             .list_topics()
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let count = topics.len();
         let json = serde_json::to_string_pretty(&topics)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(tool_ok(json))
+        if self.ui_enabled {
+            return Ok(tool_ok_ui(json, count, "topics"));
+        }
+        Ok(tool_ok_text(json))
     }
 
     /// Get the latest items from the newsletter.
@@ -166,9 +182,13 @@ impl FerrislletterServer {
             .get_latest_items(&prefs)
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let count = items.len();
         let json = serde_json::to_string_pretty(&items)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(tool_ok(json))
+        if self.ui_enabled {
+            return Ok(tool_ok_ui(json, count, "items"));
+        }
+        Ok(tool_ok_text(json))
     }
 
     /// Get the full content of a specific item.
@@ -188,7 +208,10 @@ impl FerrislletterServer {
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         let json = serde_json::to_string_pretty(&detail)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(tool_ok(json))
+        if self.ui_enabled {
+            return Ok(tool_ok_ui(json, 1, "item"));
+        }
+        Ok(tool_ok_text(json))
     }
 
     /// Search newsletter content.
@@ -223,9 +246,13 @@ impl FerrislletterServer {
             .search(&params.query, &filters)
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let count = items.len();
         let json = serde_json::to_string_pretty(&items)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(tool_ok(json))
+        if self.ui_enabled {
+            return Ok(tool_ok_ui(json, count, "results"));
+        }
+        Ok(tool_ok_text(json))
     }
 
     /// Get a recap of items published since a given date.
@@ -256,9 +283,13 @@ impl FerrislletterServer {
             .get_recap(since, &prefs)
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let count = items.len();
         let json = serde_json::to_string_pretty(&items)
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(tool_ok(json))
+        if self.ui_enabled {
+            return Ok(tool_ok_ui(json, count, "items"));
+        }
+        Ok(tool_ok_text(json))
     }
 }
 

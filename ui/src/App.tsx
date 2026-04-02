@@ -105,7 +105,7 @@ export default function App() {
 
   if (!app && !error) {
     return (
-      <div className="flex items-center justify-center h-screen gap-2 text-sm text-[var(--color-text-muted)]">
+      <div className="flex items-center justify-center min-h-[200px] gap-2 text-sm text-[var(--color-text-muted)]">
         <Loader2 size={16} className="animate-spin" aria-hidden />
         Loading…
       </div>
@@ -114,7 +114,7 @@ export default function App() {
 
   return (
     <McpAppContext.Provider value={app}>
-      <div className="h-screen p-3">
+      <div className="p-3">
         <CompactIssue
           topics={topics}
           items={items}
