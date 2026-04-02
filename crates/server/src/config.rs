@@ -82,6 +82,10 @@ pub struct TransportConfig {
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
+    /// Public base URL used for OAuth metadata (e.g. https://abc.ngrok-free.app).
+    /// Required when mode = "sse" and connecting from claude.ai.
+    #[serde(default)]
+    pub public_url: Option<String>,
 }
 
 impl Default for TransportConfig {
@@ -90,6 +94,7 @@ impl Default for TransportConfig {
             mode: TransportMode::Stdio,
             host: default_host(),
             port: default_port(),
+            public_url: None,
         }
     }
 }

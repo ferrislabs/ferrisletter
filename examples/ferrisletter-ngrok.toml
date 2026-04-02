@@ -1,0 +1,67 @@
+# ferrisletter-ngrok.toml — run the server over HTTP for claude.ai + ngrok
+#
+# 1. Start the server:
+#      ./target/release/ferrisletter-server --config examples/ferrisletter-ngrok.toml
+#
+# 2. In another terminal, expose it:
+#      ngrok http 3003
+#
+# 3. In claude.ai → Settings → Integrations → Add MCP server:
+#      URL: https://<your-id>.ngrok-free.app/mcp
+#
+# 4. Ask Claude anything — the UI panel should appear automatically.
+
+[transport]
+mode = "sse"
+host = "127.0.0.1"
+port = 3003
+public_url = "https://645b-2a01-e0a-e80-36f0-682b-91c1-7966-725c.ngrok-free.app"
+
+[connector]
+type = "rss"
+
+# AI & LLMs ----------------------------------------------------------------
+
+[[connector.feeds]]
+topic_id          = "ai"
+topic_label       = "AI & LLMs"
+topic_description = "Large language models, agents, and the AI ecosystem"
+topic_tags        = ["ai", "llm", "agents", "ml"]
+url               = "https://simonwillison.net/atom/everything/"
+
+[[connector.feeds]]
+topic_id          = "ai"
+topic_label       = "AI & LLMs"
+topic_description = "Large language models, agents, and the AI ecosystem"
+topic_tags        = ["ai", "llm", "agents", "ml"]
+url               = "https://hnrss.org/newest?q=llm+OR+claude+OR+openai&points=50"
+
+# Rust ---------------------------------------------------------------------
+
+[[connector.feeds]]
+topic_id          = "rust"
+topic_label       = "Rust"
+topic_description = "Official announcements, releases, and news from the Rust ecosystem"
+topic_tags        = ["rust", "programming", "systems"]
+url               = "https://blog.rust-lang.org/feed.xml"
+
+[[connector.feeds]]
+topic_id          = "rust"
+topic_label       = "Rust"
+topic_description = "Official announcements, releases, and news from the Rust ecosystem"
+topic_tags        = ["rust", "programming", "community"]
+url               = "https://this-week-in-rust.org/atom.xml"
+
+# Open Source & Dev --------------------------------------------------------
+
+[[connector.feeds]]
+topic_id          = "open-source"
+topic_label       = "Open Source"
+topic_description = "Open-source projects, releases, and developer news"
+topic_tags        = ["open-source", "github", "dev"]
+url               = "https://github.blog/feed/"
+
+# MCP App UI ---------------------------------------------------------------
+
+[ui]
+enabled = true

@@ -6,15 +6,16 @@ use chrono::DateTime;
 use ferrisletter_connector::{BoxedConnector, Connector, SearchFilters, UserPrefs};
 use rmcp::{
     ErrorData, ServerHandler,
-    handler::server::{router::tool::ToolRouter, wrapper::Parameters},
+    handler::server::{router::tool::ToolRouter, tool::ToolCallContext, wrapper::Parameters},
     model::{
-        AnnotateAble, CallToolResult, Content, Implementation, ListResourcesResult, Meta,
-        PaginatedRequestParams, RawResource, ReadResourceRequestParams, ReadResourceResult,
-        ResourceContents, ServerCapabilities, ServerInfo,
+        AnnotateAble, CallToolRequestParams, CallToolResult, Content, ExtensionCapabilities,
+        Implementation, ListResourcesResult, ListToolsResult, Meta, PaginatedRequestParams,
+        RawResource, ReadResourceRequestParams, ReadResourceResult,
+        ResourceContents, ServerCapabilities, ServerInfo, Tool,
     },
     schemars,
     service::RequestContext,
-    tool, tool_handler, tool_router,
+    tool, tool_router,
 };
 use serde::Deserialize;
 
@@ -53,9 +54,8 @@ impl FerrislletterServer {
     }
 }
 
-/// Build `_meta: { "ui": { "resourceUri": "ui://ferrisletter/app" } }` for
-/// tool call results, following the mcpui.dev spec.
-fn ui_meta() -> Meta {
+/// Build `_meta.ui` for tool call results (mcpui.dev / SEP-1865 spec).
+fn ui_result_meta() -> Meta {
     let mut meta = Meta::new();
     meta.insert(
         "ui".to_string(),
@@ -64,9 +64,22 @@ fn ui_meta() -> Meta {
     meta
 }
 
+/// Build `_meta.ui` for tool definitions in `list_tools` (mcpui.dev / SEP-1865 spec).
+fn ui_tool_meta() -> Meta {
+    let mut meta = Meta::new();
+    meta.insert(
+        "ui".to_string(),
+        serde_json::json!({
+            "resourceUri": UI_RESOURCE_URI,
+            "visibility": ["model", "app"]
+        }),
+    );
+    meta
+}
+
 /// Wrap serialised JSON in a successful `CallToolResult` with UI metadata.
 fn tool_ok(json: String) -> CallToolResult {
-    CallToolResult::success(vec![Content::text(json)]).with_meta(Some(ui_meta()))
+    CallToolResult::success(vec![Content::text(json)]).with_meta(Some(ui_result_meta()))
 }
 
 // --- Tool parameter types ---
@@ -249,13 +262,18 @@ impl FerrislletterServer {
     }
 }
 
-#[tool_handler(router = self.tool_router)]
 impl ServerHandler for FerrislletterServer {
     fn get_info(&self) -> ServerInfo {
         let caps = if self.ui_enabled {
+            let mut exts = ExtensionCapabilities::new();
+            exts.insert(
+                "io.modelcontextprotocol/ui".to_string(),
+                serde_json::from_value(serde_json::json!({})).unwrap(),
+            );
             ServerCapabilities::builder()
                 .enable_tools()
                 .enable_resources()
+                .enable_extensions_with(exts)
                 .build()
         } else {
             ServerCapabilities::builder().enable_tools().build()
@@ -275,6 +293,42 @@ impl ServerHandler for FerrislletterServer {
             )
     }
 
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<rmcp::RoleServer>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let tcc = ToolCallContext::new(self, request, context);
+        self.tool_router.call(tcc).await
+    }
+
+    async fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<rmcp::RoleServer>,
+    ) -> Result<ListToolsResult, ErrorData> {
+        let tools: Vec<Tool> = self
+            .tool_router
+            .list_all()
+            .into_iter()
+            .map(|mut t| {
+                if self.ui_enabled {
+                    t.meta = Some(ui_tool_meta());
+                }
+                t
+            })
+            .collect();
+        Ok(ListToolsResult {
+            tools,
+            meta: None,
+            next_cursor: None,
+        })
+    }
+
+    fn get_tool(&self, name: &str) -> Option<Tool> {
+        self.tool_router.get(name).cloned()
+    }
+
     async fn list_resources(
         &self,
         _request: Option<PaginatedRequestParams>,
@@ -285,7 +339,17 @@ impl ServerHandler for FerrislletterServer {
         }
         let mut raw = RawResource::new(UI_RESOURCE_URI, "Ferrisletter");
         raw.description = Some("Interactive newsletter digest".into());
-        raw.mime_type = Some("text/html".into());
+        raw.mime_type = Some("text/html;profile=mcp-app".into());
+        raw.meta = Some({
+            let mut meta = Meta::new();
+            meta.insert(
+                "ui".to_string(),
+                serde_json::json!({
+                    "prefersBorder": true
+                }),
+            );
+            meta
+        });
         Ok(ListResourcesResult {
             meta: None,
             resources: vec![raw.no_annotation()],
@@ -308,7 +372,8 @@ impl ServerHandler for FerrislletterServer {
             ));
         }
         Ok(ReadResourceResult::new(vec![
-            ResourceContents::text(UI_BUNDLE, UI_RESOURCE_URI).with_mime_type("text/html"),
+            ResourceContents::text(UI_BUNDLE, UI_RESOURCE_URI)
+                .with_mime_type("text/html;profile=mcp-app"),
         ]))
     }
 }
