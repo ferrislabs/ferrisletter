@@ -5,15 +5,15 @@ mod server;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use ferrisletter_connector::BoxedConnector;
-use ferrisletter_connector_rss::{FeedConfig as RssFeedConfig, RssConnector};
-use ferrisletter_connector_static::StaticConnector;
 use axum::{
     Json,
     extract::Query,
     response::Redirect,
     routing::{get, post},
 };
+use ferrisletter_connector::BoxedConnector;
+use ferrisletter_connector_rss::{FeedConfig as RssFeedConfig, RssConnector};
+use ferrisletter_connector_static::StaticConnector;
 use rmcp::ServiceExt;
 use rmcp::transport::stdio;
 use rmcp::transport::streamable_http_server::{
@@ -287,8 +287,14 @@ fn add_oauth_stub(router: axum::Router, base: String) -> axum::Router {
     };
 
     router
-        .route("/.well-known/oauth-protected-resource", get(protected_resource))
-        .route("/.well-known/oauth-authorization-server", get(auth_server_meta))
+        .route(
+            "/.well-known/oauth-protected-resource",
+            get(protected_resource),
+        )
+        .route(
+            "/.well-known/oauth-authorization-server",
+            get(auth_server_meta),
+        )
         .route("/register", post(register))
         .route("/authorize", get(authorize))
         .route("/token", post(token))

@@ -10,8 +10,8 @@ use rmcp::{
     model::{
         AnnotateAble, CallToolRequestParams, CallToolResult, Content, ExtensionCapabilities,
         Implementation, ListResourcesResult, ListToolsResult, Meta, PaginatedRequestParams,
-        RawResource, ReadResourceRequestParams, ReadResourceResult,
-        ResourceContents, ServerCapabilities, ServerInfo, Tool,
+        RawResource, ReadResourceRequestParams, ReadResourceResult, ResourceContents,
+        ServerCapabilities, ServerInfo, Tool,
     },
     schemars,
     service::RequestContext,
