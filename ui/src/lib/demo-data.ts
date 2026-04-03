@@ -78,4 +78,103 @@ export const DEMO_ITEMS: Item[] = [
     published: new Date(Date.now() - 345600000).toISOString(),
     read_time: "2 min",
   },
+  {
+    id: "demo-6",
+    topic_id: "rust",
+    headline: "Bevy 0.16 brings a new scene system and required components — this is a really long headline to test tooltip truncation behavior in the compact view",
+    summary:
+      "The popular Rust game engine overhauls its scene format and introduces required components, making entity bundles simpler and more ergonomic.",
+    tags: ["rust", "gamedev", "bevy"],
+    source: "bevyengine.org",
+    published: new Date(Date.now() - 432000000).toISOString(),
+    read_time: "7 min",
+  },
+  {
+    id: "demo-7",
+    topic_id: "rust",
+    headline: "Embassy reaches 1.0 for embedded async Rust",
+    summary:
+      "The async runtime for embedded systems hits its stable release, supporting STM32, nRF, and RP2040 families with zero-alloc async/await.",
+    tags: ["rust", "embedded", "async"],
+    source: "embassy.dev",
+    published: new Date(Date.now() - 518400000).toISOString(),
+    read_time: "5 min",
+  },
+  {
+    id: "demo-8",
+    topic_id: "ai",
+    headline: "Claude Code launches hooks for pre/post-command automation",
+    summary:
+      "Anthropic adds a hooks system to Claude Code, letting developers run custom scripts before or after specific actions — enabling linting, testing, and deployment pipelines.",
+    tags: ["ai", "claude", "tooling"],
+    source: "anthropic.com",
+    published: new Date(Date.now() - 604800000).toISOString(),
+    read_time: "3 min",
+  },
+  {
+    id: "demo-9",
+    topic_id: "ai",
+    headline: "OpenAI open-sources a lightweight MCP client library",
+    summary:
+      "A minimal TypeScript client for the Model Context Protocol, designed for quick integration into existing apps without the full SDK overhead.",
+    tags: ["ai", "mcp", "open-source"],
+    source: "github.com/openai",
+    published: new Date(Date.now() - 691200000).toISOString(),
+    read_time: "4 min",
+  },
+  {
+    id: "demo-10",
+    topic_id: "open-source",
+    headline: "Zed editor adds native MCP App panel support",
+    summary:
+      "The GPU-accelerated editor now renders MCP App UIs inline, joining Claude Desktop as a host that supports the interactive newsletter experience.",
+    tags: ["editor", "mcp", "open-source"],
+    source: "zed.dev",
+    published: new Date(Date.now() - 777600000).toISOString(),
+    read_time: "3 min",
+  },
+  {
+    id: "demo-11",
+    topic_id: "open-source",
+    headline: "SQLite 3.50 adds vector search as a built-in module",
+    summary:
+      "No extensions needed — the world's most deployed database now ships with vector similarity search out of the box, powered by DiskANN indexes.",
+    tags: ["database", "sqlite", "vector"],
+    source: "sqlite.org",
+    published: new Date(Date.now() - 864000000).toISOString(),
+    read_time: "4 min",
+  },
+  {
+    id: "demo-12",
+    topic_id: "rust",
+    headline: "Tokio 2.0 roadmap published with structured concurrency",
+    summary:
+      "The Tokio team outlines plans for structured concurrency, scoped tasks, and a simplified runtime builder — targeting a release by late 2026.",
+    tags: ["rust", "async", "tokio"],
+    source: "tokio.rs",
+    published: new Date(Date.now() - 950400000).toISOString(),
+    read_time: "6 min",
+  },
+  {
+    id: "demo-13",
+    topic_id: "ai",
+    headline: "Google DeepMind publishes Gemini tool-use benchmark results",
+    summary:
+      "New benchmarks comparing tool-use accuracy across Claude, GPT-4, and Gemini show convergence in capabilities but divergent strategies for complex multi-step tasks.",
+    tags: ["ai", "benchmark", "research"],
+    source: "deepmind.google",
+    published: new Date(Date.now() - 1036800000).toISOString(),
+    read_time: "8 min",
+  },
+  {
+    id: "demo-14",
+    topic_id: "open-source",
+    headline: "Deno 2.2 achieves full Node.js compatibility",
+    summary:
+      "With the latest release, Deno can run virtually any npm package unmodified — closing the last major gap with Node.js while keeping its security-first defaults.",
+    tags: ["javascript", "runtime", "open-source"],
+    source: "deno.com",
+    published: new Date(Date.now() - 1123200000).toISOString(),
+    read_time: "5 min",
+  },
 ];

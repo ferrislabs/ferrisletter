@@ -63,21 +63,20 @@ function TruncatedText({ text, className }: TruncatedTextProps) {
       <Tooltip.Trigger asChild>
         <span className={cn("truncate", className)}>{text}</span>
       </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
-          side="top"
-          sideOffset={4}
-          className={cn(
-            "z-50 max-w-xs rounded-md px-2.5 py-1.5 text-xs leading-snug",
-            "bg-[var(--color-bg-elevated)] text-[var(--color-text)] border border-[var(--color-border)]",
-            "shadow-md",
-            "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-          )}
-        >
-          {text}
-          <Tooltip.Arrow className="fill-[var(--color-bg-elevated)]" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
+      <Tooltip.Content
+        side="top"
+        align="start"
+        sideOffset={4}
+        className={cn(
+          "z-50 max-w-xs rounded-md px-2.5 py-1.5 text-xs leading-snug",
+          "bg-[var(--color-bg-elevated)] text-[var(--color-text)] border border-[var(--color-border)]",
+          "shadow-md",
+          "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+        )}
+      >
+        {text}
+        <Tooltip.Arrow className="fill-[var(--color-bg-elevated)]" />
+      </Tooltip.Content>
     </Tooltip.Root>
   );
 }
@@ -436,7 +435,7 @@ export function CompactIssue({
       />
 
       {/* scrollable content */}
-      <ScrollArea.Root className="flex-1 min-h-0 max-h-[clamp(300px,60dvh,800px)]">
+      <ScrollArea.Root className="flex-1 min-h-0 h-[clamp(200px,50dvh,600px)]">
         <ScrollArea.Viewport className="h-full w-full">
           {isDemo && <DemoBanner />}
 
