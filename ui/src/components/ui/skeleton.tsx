@@ -5,6 +5,7 @@ interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {}
 function Skeleton({ className, ...props }: SkeletonProps) {
   return (
     <div
+      aria-hidden="true"
       className={cn(
         "rounded-[var(--radius-md)] bg-[var(--color-bg-elevated)]",
         className,
