@@ -21,6 +21,18 @@ export interface ItemDetail extends Item {
   links: { url: string; label: string }[];
 }
 
+export type ViewMode = "digest" | "search" | "recap";
+export type SortField = "date" | "read_time";
+export type SortDirection = "asc" | "desc";
+export interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
+export interface RecapPreset {
+  label: string;
+  hours: number;
+}
+
 export interface McpState {
   status: "idle" | "connecting" | "connected" | "error" | "demo";
   topics: Topic[];
