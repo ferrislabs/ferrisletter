@@ -8,9 +8,9 @@ const badgeVariants = cva(
       variant: {
         topic:
           "bg-[var(--color-tag-bg)] text-[var(--color-accent)] border border-[var(--color-tag-border)]",
-        tag: "bg-[var(--color-bg-elevated)] text-[var(--color-text-dim)] border border-[var(--color-border)]",
+        tag: "bg-[var(--color-bg-elevated)] text-[var(--color-text-muted)] border border-[var(--color-border)]",
         muted:
-          "bg-[var(--color-bg-elevated)] text-[var(--color-text-dim)]",
+          "bg-[var(--color-bg-elevated)] text-[var(--color-text-muted)]",
       },
     },
     defaultVariants: { variant: "topic" },
