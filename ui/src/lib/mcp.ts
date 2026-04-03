@@ -100,3 +100,32 @@ export async function getItemDetail(
   });
   return extractJson(result) as ItemDetail;
 }
+
+export async function searchItems(
+  app: App,
+  filters: {
+    query: string;
+    topics?: string[];
+    tags?: string[];
+    since?: string;
+    until?: string;
+    limit?: number;
+  },
+): Promise<Item[]> {
+  const result = await app.callServerTool({
+    name: "ferrisletter_search",
+    arguments: filters,
+  });
+  return extractJson(result) as Item[];
+}
+
+export async function recapItems(
+  app: App,
+  params: { since: string; topics?: string[]; max_items?: number },
+): Promise<Item[]> {
+  const result = await app.callServerTool({
+    name: "ferrisletter_recap",
+    arguments: params,
+  });
+  return extractJson(result) as Item[];
+}
