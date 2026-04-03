@@ -86,6 +86,7 @@ async fn rebuild(state: &Arc<ApiState>) {
                 topic_description: topic.description.clone(),
                 topic_tags: topic.tags.clone(),
                 url: f.url.clone(),
+                refresh_minutes: None,
             })
         })
         .collect();

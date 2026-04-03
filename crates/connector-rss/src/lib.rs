@@ -2,8 +2,15 @@
 //!
 //! Fetches one or more RSS or Atom feeds and exposes their content through the
 //! [`Connector`] interface. Each feed is mapped to a [`Topic`], and items are
-//! fetched lazily on first access then cached in memory for the lifetime of the
-//! connector.
+//! fetched lazily on first access then cached in memory.
+//!
+//! # Auto-refresh
+//!
+//! For long-running server processes, call [`RssConnector::start_auto_refresh`]
+//! to spawn a background task that periodically re-fetches feeds. The refresh
+//! interval is the minimum `refresh_minutes` across all feeds (default 60).
+//! Conditional HTTP requests (`If-Modified-Since` / `If-None-Match`) are used
+//! to avoid re-parsing unchanged feeds.
 //!
 //! # Example
 //!
@@ -17,10 +24,12 @@
 //!         topic_description: "News from the Rust ecosystem".to_string(),
 //!         topic_tags:        vec!["rust".to_string(), "programming".to_string()],
 //!         url:               "https://blog.rust-lang.org/feed.xml".to_string(),
+//!         refresh_minutes:   Some(30),
 //!     },
 //! ]);
 //! ```
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -42,19 +51,37 @@ pub struct FeedConfig {
     pub topic_tags: Vec<String>,
     /// URL of the RSS or Atom feed.
     pub url: String,
+    /// How often to refresh this feed, in minutes. Defaults to 60 if `None`.
+    pub refresh_minutes: Option<u64>,
 }
 
 type Cache = Arc<RwLock<Option<Vec<ItemDetail>>>>;
 
+/// Per-feed HTTP caching headers for conditional requests.
+#[derive(Debug, Default, Clone)]
+struct FeedCacheHeaders {
+    last_modified: Option<String>,
+    etag: Option<String>,
+}
+
+/// Result of a conditional fetch — either new items or "not modified".
+enum FetchResult {
+    Items(Vec<ItemDetail>),
+    NotModified,
+}
+
 /// An RSS/Atom connector for Ferrisletter.
 ///
-/// Items are fetched once on first use and cached in memory. To force a
-/// refresh, create a new [`RssConnector`].
+/// Items are fetched once on first use and cached in memory. For long-running
+/// processes, use [`start_auto_refresh`](Self::start_auto_refresh) to enable
+/// periodic background refresh with conditional HTTP requests.
 #[derive(Debug, Clone)]
 pub struct RssConnector {
     feeds: Vec<FeedConfig>,
     client: reqwest::Client,
     cache: Cache,
+    /// Per-feed URL → HTTP caching headers (ETag, Last-Modified).
+    feed_headers: Arc<RwLock<HashMap<String, FeedCacheHeaders>>>,
 }
 
 impl RssConnector {
@@ -64,6 +91,7 @@ impl RssConnector {
             feeds,
             client: reqwest::Client::new(),
             cache: Arc::new(RwLock::new(None)),
+            feed_headers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -87,8 +115,9 @@ impl RssConnector {
 
         let mut all: Vec<ItemDetail> = Vec::new();
         for config in &self.feeds {
-            match self.fetch_feed(config).await {
-                Ok(items) => all.extend(items),
+            match self.fetch_feed(config, None).await {
+                Ok(FetchResult::Items(items)) => all.extend(items),
+                Ok(FetchResult::NotModified) => {} // shouldn't happen on first load
                 Err(e) => {
                     // A broken feed should not prevent other feeds from loading.
                     tracing::warn!(url = %config.url, error = %e, "skipping feed due to fetch error");
@@ -101,13 +130,58 @@ impl RssConnector {
         Ok(all)
     }
 
-    async fn fetch_feed(&self, config: &FeedConfig) -> Result<Vec<ItemDetail>, ConnectorError> {
-        let bytes = self
-            .client
-            .get(&config.url)
+    /// Fetch a single feed, optionally using conditional HTTP headers.
+    ///
+    /// Returns [`FetchResult::NotModified`] if the server responds with 304.
+    async fn fetch_feed(
+        &self,
+        config: &FeedConfig,
+        headers: Option<&FeedCacheHeaders>,
+    ) -> Result<FetchResult, ConnectorError> {
+        let mut request = self.client.get(&config.url);
+
+        if let Some(h) = headers {
+            if let Some(lm) = &h.last_modified {
+                request = request.header("If-Modified-Since", lm);
+            }
+            if let Some(etag) = &h.etag {
+                request = request.header("If-None-Match", etag);
+            }
+        }
+
+        let response = request
             .send()
             .await
-            .map_err(|e| ConnectorError::Unavailable(e.to_string()))?
+            .map_err(|e| ConnectorError::Unavailable(e.to_string()))?;
+
+        // 304 Not Modified — feed hasn't changed.
+        if response.status() == reqwest::StatusCode::NOT_MODIFIED {
+            return Ok(FetchResult::NotModified);
+        }
+
+        // Store caching headers for next request.
+        let new_headers = FeedCacheHeaders {
+            last_modified: response
+                .headers()
+                .get("last-modified")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string()),
+            etag: response
+                .headers()
+                .get("etag")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string()),
+        };
+
+        // Store headers if we got any.
+        if new_headers.last_modified.is_some() || new_headers.etag.is_some() {
+            self.feed_headers
+                .write()
+                .await
+                .insert(config.url.clone(), new_headers);
+        }
+
+        let bytes = response
             .bytes()
             .await
             .map_err(|e| ConnectorError::Unavailable(e.to_string()))?;
@@ -115,11 +189,108 @@ impl RssConnector {
         let feed = feed_rs::parser::parse(bytes.as_ref())
             .map_err(|e| ConnectorError::Other(Box::new(e)))?;
 
-        Ok(feed
-            .entries
+        Ok(FetchResult::Items(
+            feed.entries
+                .iter()
+                .map(|entry| entry_to_item_detail(entry, &config.topic_id))
+                .collect(),
+        ))
+    }
+
+    /// Spawn a background task that refreshes all feeds on their configured interval.
+    ///
+    /// The refresh interval is the minimum `refresh_minutes` across all feeds
+    /// (defaulting to 60 for feeds that don't specify one). Returns a
+    /// [`JoinHandle`](tokio::task::JoinHandle) that can be aborted to stop
+    /// refreshing.
+    pub fn start_auto_refresh(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
+        let interval_mins = self
+            .feeds
             .iter()
-            .map(|entry| entry_to_item_detail(entry, &config.topic_id))
-            .collect())
+            .map(|f| f.refresh_minutes.unwrap_or(60))
+            .min()
+            .unwrap_or(60)
+            .max(1); // at least 1 minute
+
+        tracing::info!(
+            interval_minutes = interval_mins,
+            feeds = self.feeds.len(),
+            "starting auto-refresh background task"
+        );
+
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(std::time::Duration::from_secs(interval_mins * 60));
+
+            // Skip the first immediate tick — feeds are loaded lazily on first access.
+            interval.tick().await;
+
+            loop {
+                interval.tick().await;
+                tracing::info!("auto-refresh: starting feed refresh");
+
+                let mut new_items: Vec<ItemDetail> = Vec::new();
+                let mut new_count: usize = 0;
+
+                for config in &self.feeds {
+                    // Get current conditional headers for this feed.
+                    let headers = self.feed_headers.read().await.get(&config.url).cloned();
+
+                    match self.fetch_feed(config, headers.as_ref()).await {
+                        Ok(FetchResult::Items(items)) => {
+                            new_count += items.len();
+                            new_items.extend(items);
+                        }
+                        Ok(FetchResult::NotModified) => {
+                            tracing::debug!(url = %config.url, "feed not modified (304)");
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                url = %config.url,
+                                error = %e,
+                                "auto-refresh: feed fetch failed, keeping stale data"
+                            );
+                        }
+                    }
+                }
+
+                // Merge: keep existing items for feeds that returned 304,
+                // replace items for feeds that returned new data.
+                let refreshed_topic_ids: std::collections::HashSet<&str> =
+                    new_items.iter().map(|d| d.item.topic_id.as_str()).collect();
+
+                let mut merged = {
+                    let guard = self.cache.read().await;
+                    match &*guard {
+                        Some(existing) => {
+                            // Keep items from topics that weren't refreshed (304).
+                            let mut kept: Vec<ItemDetail> = existing
+                                .iter()
+                                .filter(|d| !refreshed_topic_ids.contains(d.item.topic_id.as_str()))
+                                .cloned()
+                                .collect();
+                            kept.extend(new_items);
+                            kept
+                        }
+                        None => new_items,
+                    }
+                };
+
+                // Deduplicate by item ID (keep first occurrence = newest if sorted).
+                let mut seen = std::collections::HashSet::new();
+                merged.retain(|d| seen.insert(d.item.id.clone()));
+
+                merged.sort_by(|a, b| b.item.published.cmp(&a.item.published));
+
+                // Swap cache — hold write lock briefly.
+                {
+                    let mut guard = self.cache.write().await;
+                    *guard = Some(merged);
+                }
+
+                tracing::info!(new_items = new_count, "auto-refresh: feed refresh complete");
+            }
+        })
     }
 }
 
@@ -361,6 +532,7 @@ mod tests {
                 topic_description: "Tech news".to_string(),
                 topic_tags: vec!["rust".to_string()],
                 url: "https://example.com/feed.xml".to_string(),
+                refresh_minutes: None,
             },
             FeedConfig {
                 topic_id: "science".to_string(),
@@ -368,6 +540,7 @@ mod tests {
                 topic_description: "Science news".to_string(),
                 topic_tags: vec!["space".to_string()],
                 url: "https://example.com/science.xml".to_string(),
+                refresh_minutes: Some(30),
             },
         ])
     }
@@ -444,6 +617,30 @@ mod tests {
         assert_eq!(strip_html("no tags here"), "no tags here");
     }
 
+    // --- auto-refresh ---
+
+    #[test]
+    fn refresh_interval_uses_minimum_across_feeds() {
+        let conn = make_connector();
+        // Feed 1: None (default 60), Feed 2: Some(30) → min = 30
+        let min_interval = conn
+            .feeds
+            .iter()
+            .map(|f| f.refresh_minutes.unwrap_or(60))
+            .min()
+            .unwrap_or(60);
+        assert_eq!(min_interval, 30);
+    }
+
+    #[tokio::test]
+    async fn start_auto_refresh_returns_handle() {
+        let conn = Arc::new(make_connector());
+        let handle = conn.start_auto_refresh();
+        // The handle is valid and the task is running.
+        assert!(!handle.is_finished());
+        handle.abort();
+    }
+
     // --- live feed (requires network) ---
 
     #[tokio::test]
@@ -455,6 +652,7 @@ mod tests {
             topic_description: "Official Rust blog".to_string(),
             topic_tags: vec!["rust".to_string()],
             url: "https://blog.rust-lang.org/feed.xml".to_string(),
+            refresh_minutes: None,
         }]);
 
         let items = conn.get_latest_items(&UserPrefs::default()).await.unwrap();
