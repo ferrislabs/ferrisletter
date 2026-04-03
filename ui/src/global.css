@@ -102,6 +102,11 @@
     background: var(--color-border-hover);
     border-radius: 3px;
   }
+
+  /* Light mode: darken scrollbar thumb for better visibility on white */
+  [data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: #a1a1aa;
+  }
 }
 
 /* Reusable animation keyframes */
