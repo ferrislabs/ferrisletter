@@ -3,9 +3,9 @@ import { Loader2 } from "lucide-react";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import {
   applyDocumentTheme,
-  applyHostStyleVariables,
   applyHostFonts,
 } from "@modelcontextprotocol/ext-apps";
+import { applySafeHostStyleVariables } from "@/lib/host-context";
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { CompactIssue } from "@/views/CompactIssue";
 import { SearchPanel } from "@/views/SearchPanel";
@@ -28,7 +28,7 @@ function dedupeById<T extends { id: string }>(arr: T[]): T[] {
 function applyHostContext(ctx: McpUiHostContext | undefined) {
   if (!ctx) return;
   if (ctx.theme) applyDocumentTheme(ctx.theme);
-  if (ctx.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
+  if (ctx.styles?.variables) applySafeHostStyleVariables(ctx.styles.variables);
   if (ctx.styles?.css?.fonts) applyHostFonts(ctx.styles.css.fonts);
 }
 
