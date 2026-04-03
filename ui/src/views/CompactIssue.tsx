@@ -1,10 +1,85 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { ChevronDown, ExternalLink, Clock, Loader2, RotateCw } from "lucide-react";
+import * as ScrollArea from "@radix-ui/react-scroll-area";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import { AlertCircle, ChevronDown, ExternalLink, Clock, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate } from "@/lib/utils";
 import { useMcpApp, getItemDetail } from "@/lib/mcp";
 import type { Item, ItemDetail, Topic } from "@/types";
+
+// ── Skeleton primitives ──────────────────────────────────────────────────────
+
+function SkeletonLine({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "rounded bg-[var(--color-bg-elevated)] animate-pulse",
+        className,
+      )}
+    />
+  );
+}
+
+function SkeletonItemRow() {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3">
+      <div className="mt-1 shrink-0 w-3.5 h-3.5 rounded bg-[var(--color-bg-elevated)] animate-pulse" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <SkeletonLine className="h-4 w-[85%]" />
+        <div className="flex items-center gap-2">
+          <SkeletonLine className="h-3 w-24" />
+          <SkeletonLine className="h-3 w-16" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonTopicSection() {
+  return (
+    <div>
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--color-border)]">
+        <SkeletonLine className="h-5 w-16 rounded-sm" />
+        <SkeletonLine className="h-3 w-12" />
+      </div>
+      <SkeletonItemRow />
+      <SkeletonItemRow />
+      <SkeletonItemRow />
+    </div>
+  );
+}
+
+// ── Truncated text with tooltip ──────────────────────────────────────────────
+
+interface TruncatedTextProps {
+  text: string;
+  className?: string;
+}
+
+function TruncatedText({ text, className }: TruncatedTextProps) {
+  return (
+    <Tooltip.Root delayDuration={400}>
+      <Tooltip.Trigger asChild>
+        <span className={cn("truncate", className)}>{text}</span>
+      </Tooltip.Trigger>
+      <Tooltip.Content
+        side="top"
+        align="start"
+        sideOffset={4}
+        className={cn(
+          "z-50 max-w-xs rounded-md px-2.5 py-1.5 text-xs leading-snug",
+          "bg-[var(--color-bg-elevated)] text-[var(--color-text)] border border-[var(--color-border)]",
+          "shadow-md",
+          "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+        )}
+      >
+        {text}
+        <Tooltip.Arrow className="fill-[var(--color-bg-elevated)]" />
+      </Tooltip.Content>
+    </Tooltip.Root>
+  );
+}
 
 // ── Item row ──────────────────────────────────────────────────────────────────
 
@@ -18,23 +93,30 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const fetchDetail = useCallback(async () => {
+    if (!app || isDemo) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const d = await getItemDetail(app, item.id);
+      setDetail(d);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [app, isDemo, item.id]);
 
   const handleOpen = useCallback(
     async (next: boolean) => {
       setOpen(next);
-      if (next && !detail && !isDemo && app) {
-        setLoading(true);
-        try {
-          const d = await getItemDetail(app, item.id);
-          setDetail(d);
-        } catch {
-          // fall back to summary
-        } finally {
-          setLoading(false);
-        }
+      if (next && !detail && !error) {
+        await fetchDetail();
       }
     },
-    [detail, isDemo, item.id, app],
+    [detail, error, fetchDetail],
   );
 
   const body = detail?.body ?? item.summary;
@@ -46,8 +128,9 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
         <button
           className={cn(
             "w-full text-left flex items-start gap-3 px-4 py-3 rounded-md",
-            "transition-colors hover:bg-[var(--color-bg-elevated)]",
+            "transition-all duration-150 hover:bg-[var(--color-bg-elevated)]",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]",
+            "active:scale-[0.995]",
             "group",
           )}
           aria-expanded={open}
@@ -55,20 +138,22 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
           <ChevronDown
             size={14}
             className={cn(
-              "mt-1 shrink-0 text-[var(--color-text-dim)] transition-transform duration-200",
+              "mt-1 shrink-0 text-[var(--color-text-dim)] transition-transform duration-200 ease-out motion-reduce:transition-none",
               open && "rotate-180",
             )}
             aria-hidden
           />
 
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-[var(--color-text)] leading-snug">
-              {item.headline}
-            </p>
+            <TruncatedText
+              text={item.headline}
+              className="block text-sm font-medium text-[var(--color-text)] leading-snug"
+            />
             <div className="mt-1 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-[var(--color-text-dim)] truncate max-w-[160px]">
-                {item.source}
-              </span>
+              <TruncatedText
+                text={item.source}
+                className="text-xs text-[var(--color-text-dim)] max-w-[160px]"
+              />
               <span className="text-[var(--color-border-hover)]">·</span>
               <span className="text-xs text-[var(--color-text-dim)]">
                 {formatDate(item.published)}
@@ -87,12 +172,26 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
         </button>
       </Collapsible.Trigger>
 
-      <Collapsible.Content className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-up-2 data-[state=open]:slide-down-2">
+      <Collapsible.Content className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-up-2 data-[state=open]:slide-down-2 duration-200 ease-out">
         <div className="px-4 pb-4 ml-[26px]">
           {loading ? (
-            <div className="flex items-center gap-2 text-xs text-[var(--color-text-dim)] py-2">
-              <Loader2 size={12} className="animate-spin" aria-hidden />
-              Loading…
+            <div className="space-y-2 py-2">
+              <SkeletonLine className="h-3.5 w-full" />
+              <SkeletonLine className="h-3.5 w-[90%]" />
+              <SkeletonLine className="h-3.5 w-[60%]" />
+            </div>
+          ) : error ? (
+            <div className="flex items-center gap-2 py-2">
+              <AlertCircle size={13} className="shrink-0 text-red-400" aria-hidden />
+              <span className="text-xs text-[var(--color-text-dim)]">
+                Failed to load details.
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); void fetchDetail(); }}
+                className="text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors"
+              >
+                Retry
+              </button>
             </div>
           ) : (
             <>
@@ -143,8 +242,6 @@ interface TopicSectionProps {
 }
 
 function TopicSection({ topic, items, isDemo }: TopicSectionProps) {
-  if (items.length === 0) return null;
-
   return (
     <section aria-labelledby={`topic-${topic.id}`}>
       <div className="flex items-center gap-2 px-4 py-2 sticky top-0 bg-[var(--color-bg-card)] z-10 border-b border-[var(--color-border)]">
@@ -154,13 +251,19 @@ function TopicSection({ topic, items, isDemo }: TopicSectionProps) {
         </span>
       </div>
 
-      <ul role="list">
-        {items.map((item) => (
-          <li key={item.id}>
-            <ItemRow item={item} isDemo={isDemo} />
-          </li>
-        ))}
-      </ul>
+      {items.length === 0 ? (
+        <div className="flex items-center justify-center py-6 text-xs text-[var(--color-text-dim)]">
+          No items in this topic yet.
+        </div>
+      ) : (
+        <ul role="list" className="divide-y divide-[var(--color-border)]/30">
+          {items.map((item) => (
+            <li key={item.id}>
+              <ItemRow item={item} isDemo={isDemo} />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -174,14 +277,39 @@ interface TopicFilterProps {
 }
 
 function TopicFilter({ topics, active, onChange }: TopicFilterProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   if (topics.length <= 1) return null;
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const buttons = containerRef.current?.querySelectorAll<HTMLButtonElement>("button");
+    if (!buttons?.length) return;
+    const idx = Array.from(buttons).findIndex((b) => b === document.activeElement);
+    const next =
+      e.key === "ArrowRight"
+        ? (idx + 1) % buttons.length
+        : (idx - 1 + buttons.length) % buttons.length;
+    buttons[next].focus();
+  };
+
   return (
-    <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-[var(--color-border)] overflow-x-auto shrink-0">
+    <div
+      ref={containerRef}
+      role="tablist"
+      aria-label="Filter by topic"
+      onKeyDown={handleKeyDown}
+      className="flex items-center gap-1.5 px-4 py-2.5 border-b border-[var(--color-border)] overflow-x-auto shrink-0"
+    >
       <button
+        role="tab"
+        aria-selected={active === null}
+        tabIndex={active === null ? 0 : -1}
         onClick={() => onChange(null)}
         className={cn(
           "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]",
           active === null
             ? "bg-[var(--color-accent)] text-white"
             : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-elevated)]",
@@ -192,9 +320,13 @@ function TopicFilter({ topics, active, onChange }: TopicFilterProps) {
       {topics.map((t) => (
         <button
           key={t.id}
+          role="tab"
+          aria-selected={active === t.id}
+          tabIndex={active === t.id ? 0 : active === null ? -1 : -1}
           onClick={() => onChange(active === t.id ? null : t.id)}
           className={cn(
             "shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]",
             active === t.id
               ? "bg-[var(--color-accent)] text-white"
               : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-elevated)]",
@@ -223,6 +355,7 @@ interface CompactIssueProps {
   topics: Topic[];
   items: Item[];
   isDemo: boolean;
+  isLoading: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
 }
@@ -231,6 +364,7 @@ export function CompactIssue({
   topics,
   items,
   isDemo,
+  isLoading,
   isRefreshing,
   onRefresh,
 }: CompactIssueProps) {
@@ -255,6 +389,7 @@ export function CompactIssue({
       : null;
 
   return (
+    <Tooltip.Provider delayDuration={400} skipDelayDuration={100}>
     <div className="flex flex-col bg-[var(--color-bg-card)] rounded-lg border border-[var(--color-border)] overflow-hidden">
       {/* header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] shrink-0">
@@ -300,24 +435,52 @@ export function CompactIssue({
       />
 
       {/* scrollable content */}
-      <div className="overflow-y-auto max-h-[600px]">
-        {isDemo && <DemoBanner />}
+      <ScrollArea.Root className="flex-1 min-h-0 h-[clamp(200px,50dvh,600px)]">
+        <ScrollArea.Viewport className="h-full w-full">
+          {isDemo && <DemoBanner />}
 
-        {visibleTopics.map((topic) => (
-          <TopicSection
-            key={topic.id}
-            topic={topic}
-            items={byTopic(topic.id)}
-            isDemo={isDemo}
-          />
-        ))}
+          {isLoading ? (
+            <>
+              <SkeletonTopicSection />
+              <SkeletonTopicSection />
+            </>
+          ) : (
+            <>
+              {visibleTopics.map((topic) => (
+                <TopicSection
+                  key={topic.id}
+                  topic={topic}
+                  items={byTopic(topic.id)}
+                  isDemo={isDemo}
+                />
+              ))}
 
-        {visibleItems.length === 0 && (
-          <div className="flex items-center justify-center h-32 text-sm text-[var(--color-text-dim)]">
-            No items yet.
-          </div>
-        )}
-      </div>
+              {visibleItems.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-32 gap-1.5">
+                  <span className="text-sm text-[var(--color-text-dim)]">
+                    {activeTopicId ? "No items match this filter." : "No items yet."}
+                  </span>
+                  {activeTopicId && (
+                    <button
+                      onClick={() => setActiveTopicId(null)}
+                      className="text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors"
+                    >
+                      Show all topics
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </ScrollArea.Viewport>
+        <ScrollArea.Scrollbar
+          orientation="vertical"
+          className="flex w-1.5 touch-none select-none p-px transition-colors data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out-0 data-[state=visible]:fade-in-0"
+        >
+          <ScrollArea.Thumb className="relative flex-1 rounded-full bg-[var(--color-border-hover)]" />
+        </ScrollArea.Scrollbar>
+      </ScrollArea.Root>
     </div>
+    </Tooltip.Provider>
   );
 }

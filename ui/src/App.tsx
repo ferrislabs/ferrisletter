@@ -32,6 +32,7 @@ function applyHostContext(ctx: McpUiHostContext | undefined) {
 export default function App() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
 
@@ -74,7 +75,8 @@ export default function App() {
       })
       .catch(() => {
         // If tool calls fail, keep whatever we have from push notifications.
-      });
+      })
+      .finally(() => setLoading(false));
   }, [app]);
 
   // Fall back to demo mode on connection error.
@@ -83,6 +85,7 @@ export default function App() {
       setTopics(DEMO_TOPICS);
       setItems(DEMO_ITEMS);
       setIsDemo(true);
+      setLoading(false);
     }
   }, [error]);
 
@@ -119,6 +122,7 @@ export default function App() {
           topics={topics}
           items={items}
           isDemo={isDemo}
+          isLoading={loading}
           isRefreshing={refreshing}
           onRefresh={() => void handleRefresh()}
         />
