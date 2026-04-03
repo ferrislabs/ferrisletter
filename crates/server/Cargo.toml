@@ -6,6 +6,14 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[lib]
+name = "ferrisletter_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ferrisletter-server"
+path = "src/main.rs"
+
 [dependencies]
 ferrisletter-connector = { path = "../connector" }
 ferrisletter-connector-rss = { path = "../connector-rss" }
