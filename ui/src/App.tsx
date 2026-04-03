@@ -8,6 +8,9 @@ import {
 } from "@modelcontextprotocol/ext-apps";
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { CompactIssue } from "@/views/CompactIssue";
+import { SearchPanel } from "@/views/SearchPanel";
+import { RecapPanel } from "@/views/RecapPanel";
+import { ViewToggle } from "@/components/ViewToggle";
 import {
   McpAppContext,
   inferToolResult,
@@ -15,7 +18,7 @@ import {
   getLatestItems as fetchLatestItems,
 } from "@/lib/mcp";
 import { DEMO_TOPICS, DEMO_ITEMS } from "@/lib/demo-data";
-import type { Item, Topic } from "@/types";
+import type { Item, Topic, ViewMode } from "@/types";
 
 function dedupeById<T extends { id: string }>(arr: T[]): T[] {
   const seen = new Set<string>();
@@ -35,6 +38,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [activeView, setActiveView] = useState<ViewMode>("digest");
 
   const { app, error } = useApp({
     appInfo: { name: "ferrisletter-ui", version: "0.1.0" },
@@ -118,14 +122,26 @@ export default function App() {
   return (
     <McpAppContext.Provider value={app}>
       <div className="p-3">
-        <CompactIssue
-          topics={topics}
-          items={items}
-          isDemo={isDemo}
-          isLoading={loading}
-          isRefreshing={refreshing}
-          onRefresh={() => void handleRefresh()}
-        />
+        <ViewToggle activeView={activeView} onChange={setActiveView} />
+
+        {activeView === "digest" && (
+          <CompactIssue
+            topics={topics}
+            items={items}
+            isDemo={isDemo}
+            isLoading={loading}
+            isRefreshing={refreshing}
+            onRefresh={() => void handleRefresh()}
+          />
+        )}
+
+        {activeView === "search" && (
+          <SearchPanel topics={topics} isDemo={isDemo} />
+        )}
+
+        {activeView === "recap" && (
+          <RecapPanel topics={topics} isDemo={isDemo} />
+        )}
       </div>
     </McpAppContext.Provider>
   );

@@ -48,14 +48,19 @@ export function ResultsList({
   return (
     <div className="flex flex-col">
       {/* toolbar */}
-      <div className="flex items-center justify-between gap-2 px-4 py-2 border-b border-[var(--color-border)]">
+      <div className="flex flex-col gap-1 px-4 py-2 border-b border-[var(--color-border)]">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-dim)]">
+            {sorted.length} {sorted.length === 1 ? "result" : "results"}
+          </span>
+          <SortControls sort={sort} onChange={onSortChange} />
+        </div>
         <TagFilter
           availableTags={availableTags}
           activeTags={activeTags}
           onToggle={onTagToggle}
           onClear={onTagsClear}
         />
-        <SortControls sort={sort} onChange={onSortChange} />
       </div>
 
       {/* results */}
