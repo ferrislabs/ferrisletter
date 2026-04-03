@@ -1,10 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, WifiOff } from "lucide-react";
 import { CompactIssue } from "@/views/CompactIssue";
 import { connectMcp, listTopics, getLatestItems } from "@/lib/mcp";
 import { resolveServerUrl } from "@/lib/utils";
 import { DEMO_TOPICS, DEMO_ITEMS } from "@/lib/demo-data";
 import type { McpState } from "@/types";
+
+function dedupeTopics<T extends { id: string }>(topics: T[]): T[] {
+  const seen = new Set<string>();
+  return topics.filter((t) => seen.size < seen.add(t.id).size || !seen.has(t.id)
+    ? (seen.add(t.id), true)
+    : false
+  );
+}
 
 export default function App() {
   const [state, setState] = useState<McpState>({
@@ -13,46 +21,51 @@ export default function App() {
     items: [],
   });
 
-  useEffect(() => {
-    const serverUrl = resolveServerUrl();
+  const serverUrl = resolveServerUrl();
 
-    if (!serverUrl) {
-      // No server configured — show demo content.
-      setState({ status: "demo", topics: DEMO_TOPICS, items: DEMO_ITEMS });
-      return;
-    }
+  const load = useCallback(
+    async (isRefresh = false) => {
+      if (!serverUrl) {
+        setState({ status: "demo", topics: DEMO_TOPICS, items: DEMO_ITEMS });
+        return;
+      }
 
-    let cancelled = false;
+      setState((s) => ({
+        ...s,
+        status: isRefresh ? "connected" : "connecting",
+        refreshing: isRefresh,
+      }));
 
-    async function load() {
-      setState((s) => ({ ...s, status: "connecting" }));
       try {
-        await connectMcp(serverUrl!);
-        if (cancelled) return;
+        if (!isRefresh) await connectMcp(serverUrl);
 
         const [topics, items] = await Promise.all([
           listTopics(),
           getLatestItems(),
         ]);
-        if (cancelled) return;
 
-        setState({ status: "connected", topics, items });
+        setState({
+          status: "connected",
+          topics: dedupeTopics(topics),
+          items,
+          refreshing: false,
+        });
       } catch (err) {
-        if (cancelled) return;
         setState({
           status: "error",
           topics: [],
           items: [],
           error: err instanceof Error ? err.message : "Connection failed",
+          refreshing: false,
         });
       }
-    }
+    },
+    [serverUrl],
+  );
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useEffect(() => {
+    void load(false);
+  }, [load]);
 
   if (state.status === "idle" || state.status === "connecting") {
     return (
@@ -83,6 +96,8 @@ export default function App() {
         topics={state.topics}
         items={state.items}
         isDemo={state.status === "demo"}
+        isRefreshing={!!(state as { refreshing?: boolean }).refreshing}
+        onRefresh={() => void load(true)}
       />
     </div>
   );
