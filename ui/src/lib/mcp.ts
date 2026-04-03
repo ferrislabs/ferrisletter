@@ -1,58 +1,102 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+/**
+ * MCP App SDK integration layer.
+ *
+ * Uses @modelcontextprotocol/ext-apps for the full MCP App lifecycle:
+ *   - Initialization handshake via useApp hook
+ *   - Tool result notifications (ontoolresult)
+ *   - On-demand tool calls via callServerTool
+ *   - Host context / theme integration
+ */
+import { createContext, useContext } from "react";
+import type { App } from "@modelcontextprotocol/ext-apps";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { Item, ItemDetail, Topic } from "@/types";
 
-let _client: Client | null = null;
+// ── React context for the App instance ──────────────────────────────────────
 
-export async function connectMcp(serverUrl: string): Promise<Client> {
-  const transport = new SSEClientTransport(new URL(serverUrl + "/sse"));
-  const client = new Client(
-    { name: "ferrisletter-ui", version: "0.1.0" },
-    { capabilities: {} },
-  );
-  await client.connect(transport);
-  _client = client;
-  return client;
+export const McpAppContext = createContext<App | null>(null);
+
+export function useMcpApp(): App | null {
+  return useContext(McpAppContext);
 }
 
-function requireClient(): Client {
-  if (!_client) throw new Error("MCP client not connected");
-  return _client;
+// ── Tool result parsing ─────────────────────────────────────────────────────
+
+function extractJson(result: CallToolResult): unknown {
+  // When UI is enabled the server returns [note, json] — try each text block.
+  const textBlocks = result.content?.filter((c) => c.type === "text") ?? [];
+  for (const block of textBlocks) {
+    if (block.type !== "text") continue;
+    try {
+      return JSON.parse(block.text);
+    } catch {
+      // not JSON, skip (e.g. the human-readable note)
+    }
+  }
+  throw new Error("no JSON content in tool result");
 }
 
-function parseToolText(result: unknown): unknown {
-  const r = result as { content?: { type: string; text: string }[] };
-  const block = r.content?.find((c) => c.type === "text");
-  if (!block) throw new Error("No text content in tool result");
-  return JSON.parse(block.text);
+/** Infer the kind of data from the shape of the parsed JSON. */
+export type InferredData =
+  | { kind: "topics"; data: Topic[] }
+  | { kind: "items"; data: Item[] }
+  | { kind: "item_detail"; data: ItemDetail }
+  | { kind: "unknown"; data: unknown };
+
+export function inferToolResult(result: CallToolResult): InferredData {
+  try {
+    const data = extractJson(result);
+    if (Array.isArray(data) && data.length > 0) {
+      const first = data[0];
+      if ("label" in first && "description" in first) {
+        return { kind: "topics", data: data as Topic[] };
+      }
+      if ("headline" in first && "topic_id" in first) {
+        return { kind: "items", data: data as Item[] };
+      }
+    }
+    if (
+      data &&
+      typeof data === "object" &&
+      "body" in data &&
+      "links" in data
+    ) {
+      return { kind: "item_detail", data: data as ItemDetail };
+    }
+    return { kind: "unknown", data };
+  } catch {
+    return { kind: "unknown", data: null };
+  }
 }
 
-export async function listTopics(): Promise<Topic[]> {
-  const client = requireClient();
-  const result = await client.callTool({
+// ── Tool call helpers ───────────────────────────────────────────────────────
+
+export async function listTopics(app: App): Promise<Topic[]> {
+  const result = await app.callServerTool({
     name: "ferrisletter_list_topics",
     arguments: {},
   });
-  return parseToolText(result) as Topic[];
+  return extractJson(result) as Topic[];
 }
 
-export async function getLatestItems(topicIds?: string[]): Promise<Item[]> {
-  const client = requireClient();
-  const result = await client.callTool({
+export async function getLatestItems(
+  app: App,
+  topicIds?: string[],
+): Promise<Item[]> {
+  const result = await app.callServerTool({
     name: "ferrisletter_get_latest",
-    arguments: {
-      topic_ids: topicIds ?? [],
-      max_items: 50,
-    },
+    arguments: { topics: topicIds ?? [], max_items: 50 },
   });
-  return parseToolText(result) as Item[];
+  return extractJson(result) as Item[];
 }
 
-export async function getItemDetail(id: string): Promise<ItemDetail> {
-  const client = requireClient();
-  const result = await client.callTool({
+export async function getItemDetail(
+  app: App,
+  id: string,
+): Promise<ItemDetail> {
+  const result = await app.callServerTool({
     name: "ferrisletter_get_item",
     arguments: { id },
   });
-  return parseToolText(result) as ItemDetail;
+  return extractJson(result) as ItemDetail;
 }

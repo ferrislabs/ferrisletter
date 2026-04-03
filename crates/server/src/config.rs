@@ -23,6 +23,9 @@ pub struct Config {
 
     #[serde(default)]
     pub admin: AdminConfig,
+
+    #[serde(default)]
+    pub ui: UiConfig,
 }
 
 // --- Admin REST API ---
@@ -54,6 +57,21 @@ fn default_admin_bind() -> String {
     "127.0.0.1:3001".to_string()
 }
 
+// --- MCP App UI ---
+
+/// Enables the MCP App UI (mcpui.dev spec).
+///
+/// When enabled the server registers `ui://ferrisletter/app` as an MCP
+/// resource and includes `_meta.ui.resourceUri` in every tool call result,
+/// so that supporting clients (Claude Desktop, etc.) render the digest panel
+/// automatically.
+#[derive(Debug, Default, Deserialize, Clone)]
+pub struct UiConfig {
+    /// Register the UI resource and annotate tool results with its URI.
+    #[serde(default)]
+    pub enabled: bool,
+}
+
 // --- Transport ---
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +82,10 @@ pub struct TransportConfig {
     pub host: String,
     #[serde(default = "default_port")]
     pub port: u16,
+    /// Public base URL used for OAuth metadata (e.g. https://abc.ngrok-free.app).
+    /// Required when mode = "sse" and connecting from claude.ai.
+    #[serde(default)]
+    pub public_url: Option<String>,
 }
 
 impl Default for TransportConfig {
@@ -72,6 +94,7 @@ impl Default for TransportConfig {
             mode: TransportMode::Stdio,
             host: default_host(),
             port: default_port(),
+            public_url: None,
         }
     }
 }

@@ -3,7 +3,7 @@ import * as Collapsible from "@radix-ui/react-collapsible";
 import { ChevronDown, ExternalLink, Clock, Loader2, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatDate } from "@/lib/utils";
-import { getItemDetail } from "@/lib/mcp";
+import { useMcpApp, getItemDetail } from "@/lib/mcp";
 import type { Item, ItemDetail, Topic } from "@/types";
 
 // ── Item row ──────────────────────────────────────────────────────────────────
@@ -14,6 +14,7 @@ interface ItemRowProps {
 }
 
 function ItemRow({ item, isDemo }: ItemRowProps) {
+  const app = useMcpApp();
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,10 +22,10 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
   const handleOpen = useCallback(
     async (next: boolean) => {
       setOpen(next);
-      if (next && !detail && !isDemo) {
+      if (next && !detail && !isDemo && app) {
         setLoading(true);
         try {
-          const d = await getItemDetail(item.id);
+          const d = await getItemDetail(app, item.id);
           setDetail(d);
         } catch {
           // fall back to summary
@@ -33,7 +34,7 @@ function ItemRow({ item, isDemo }: ItemRowProps) {
         }
       }
     },
-    [detail, isDemo, item.id],
+    [detail, isDemo, item.id, app],
   );
 
   const body = detail?.body ?? item.summary;
@@ -211,11 +212,7 @@ function TopicFilter({ topics, active, onChange }: TopicFilterProps) {
 function DemoBanner() {
   return (
     <div className="mx-4 mb-3 px-3 py-2 rounded-md bg-[var(--color-accent-glow)] border border-[var(--color-tag-border)] text-xs text-[var(--color-text-muted)]">
-      Demo mode — add{" "}
-      <code className="font-mono text-[var(--color-accent)]">
-        ?server=http://localhost:3000
-      </code>{" "}
-      to connect to a live server.
+      Demo mode — not connected to an MCP host.
     </div>
   );
 }
@@ -258,7 +255,7 @@ export function CompactIssue({
       : null;
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-bg-card)] rounded-lg border border-[var(--color-border)] overflow-hidden">
+    <div className="flex flex-col bg-[var(--color-bg-card)] rounded-lg border border-[var(--color-border)] overflow-hidden">
       {/* header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] shrink-0">
         <div>
@@ -303,7 +300,7 @@ export function CompactIssue({
       />
 
       {/* scrollable content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="overflow-y-auto max-h-[600px]">
         {isDemo && <DemoBanner />}
 
         {visibleTopics.map((topic) => (

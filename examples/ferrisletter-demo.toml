@@ -75,3 +75,15 @@ topic_label       = "Open Source"
 topic_description = "Open-source projects, releases, and developer news"
 topic_tags        = ["open-source", "github", "dev"]
 url               = "https://github.blog/feed/"
+
+# --------------------------------------------------------------------------
+# MCP App UI (mcpui.dev spec) — registers ui://ferrisletter/app as an MCP
+# resource and annotates every tool call result with _meta.ui.resourceUri
+# so that supporting clients (Claude Desktop etc.) auto-render the panel.
+#
+# Requires the UI to be built first:
+#   cd ui && npm install && npm run build
+# --------------------------------------------------------------------------
+
+[ui]
+enabled = true

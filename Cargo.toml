@@ -7,6 +7,9 @@ members = [
     "crates/connector-static",
 ]
 
+[patch.crates-io]
+rmcp = { path = "vendor/rmcp" }
+
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
