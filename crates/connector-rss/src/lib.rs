@@ -34,12 +34,13 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use ferrisletter_connector::{
-    Connector, ConnectorError, Item, ItemDetail, Link as ItemLink, SearchFilters, Topic, UserPrefs,
+    BoxedConnector, Connector, ConnectorError, ConnectorFactory, Item, ItemDetail,
+    Link as ItemLink, SearchFilters, Topic, UserPrefs,
 };
 use tokio::sync::RwLock;
 
 /// Configuration for a single RSS/Atom feed.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct FeedConfig {
     /// Unique topic ID that items from this feed will be tagged with.
     pub topic_id: String,
@@ -484,6 +485,57 @@ fn strip_html(html: &str) -> String {
 fn estimate_read_time(text: &str) -> String {
     let minutes = ((text.split_whitespace().count() as f32 / 200.0).ceil() as u64).max(1);
     format!("{} min", minutes)
+}
+
+/// Factory for creating [`RssConnector`] instances from TOML configuration.
+///
+/// Expects the `[connector]` table to contain a `feeds` array matching the
+/// [`FeedConfig`] structure. Auto-refresh is started automatically.
+///
+/// # Config example
+///
+/// ```toml
+/// [connector]
+/// type = "rss"
+///
+/// [[connector.feeds]]
+/// topic_id = "rust"
+/// topic_label = "Rust"
+/// topic_description = "Rust news"
+/// url = "https://blog.rust-lang.org/feed.xml"
+/// ```
+pub struct RssConnectorFactory;
+
+impl ConnectorFactory for RssConnectorFactory {
+    fn connector_type(&self) -> &str {
+        "rss"
+    }
+
+    fn create(&self, config: &toml::Value) -> Result<BoxedConnector, ConnectorError> {
+        // Deserialize the `feeds` array from the connector table.
+        let feeds_value = config.get("feeds").ok_or_else(|| {
+            ConnectorError::Other("RSS connector requires a 'feeds' array".into())
+        })?;
+
+        let feeds: Vec<FeedConfig> = feeds_value
+            .clone()
+            .try_into()
+            .map_err(|e: toml::de::Error| ConnectorError::Other(Box::new(e)))?;
+
+        if feeds.is_empty() {
+            return Err(ConnectorError::Other(
+                "RSS connector requires at least one feed".into(),
+            ));
+        }
+
+        let connector = Arc::new(RssConnector::new(feeds));
+
+        // Start auto-refresh in the background. The handle is intentionally
+        // leaked — the task runs for the lifetime of the process.
+        let _refresh_handle = connector.clone().start_auto_refresh();
+
+        Ok(BoxedConnector::new(connector.as_ref().clone()))
+    }
 }
 
 #[cfg(test)]

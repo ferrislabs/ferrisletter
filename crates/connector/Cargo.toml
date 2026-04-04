@@ -10,3 +10,4 @@ repository.workspace = true
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"
+toml = "0.8"
