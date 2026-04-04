@@ -143,6 +143,9 @@ pub struct FeedConfig {
     #[serde(default)]
     pub topic_tags: Vec<String>,
     pub url: String,
+    /// How often to refresh this feed, in minutes. Defaults to 60 if omitted.
+    #[serde(default)]
+    pub refresh_minutes: Option<u64>,
 }
 
 // --- Loading ---

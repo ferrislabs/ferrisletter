@@ -147,9 +147,14 @@ async fn build_connector(
                     topic_description: f.topic_description.clone(),
                     topic_tags: f.topic_tags.clone(),
                     url: f.url.clone(),
+                    refresh_minutes: f.refresh_minutes,
                 })
                 .collect();
-            Ok(Arc::new(BoxedConnector::new(RssConnector::new(rss_feeds))))
+            let connector = Arc::new(RssConnector::new(rss_feeds));
+            let boxed = Arc::new(BoxedConnector::new(connector.as_ref().clone()));
+            // Spawn auto-refresh background task.
+            let _refresh_handle = connector.start_auto_refresh();
+            Ok(boxed)
         }
         _ => {
             // No config or empty static path — try env var then embedded sample.
