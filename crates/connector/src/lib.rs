@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 mod error;
 pub use error::ConnectorError;
 
+mod factory;
+pub use factory::{ConnectorFactory, ConnectorRegistry};
+
 /// A content source that provides news items to Ferrisletter.
 pub trait Connector: Send + Sync {
     /// Returns the available content categories.

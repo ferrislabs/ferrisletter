@@ -1,9 +1,9 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use ferrisletter_connector::BoxedConnector;
-use ferrisletter_connector_rss::{FeedConfig as RssFeedConfig, RssConnector};
-use ferrisletter_connector_static::StaticConnector;
+use ferrisletter_connector::{BoxedConnector, ConnectorRegistry};
+use ferrisletter_connector_rss::RssConnectorFactory;
+use ferrisletter_connector_static::StaticConnectorFactory;
 use ferrisletter_server::api::{ApiState, ConnectorHandle, FeedRecord, TopicRecord};
 use ferrisletter_server::config::{ConnectorConfig, TransportMode};
 use ferrisletter_server::server::FerrislletterServer;
@@ -37,9 +37,11 @@ async fn main() -> anyhow::Result<()> {
     // Seed the API state from the config so the REST API reflects the initial feeds.
     let (initial_topics, initial_feeds) = extract_api_records(&cfg.connector);
 
-    // Build the initial connector.
-    let initial_connector: Arc<BoxedConnector> =
-        build_connector(&cfg.connector, cli_config.as_deref()).await?;
+    // Build the connector registry and create the initial connector.
+    let registry = default_registry();
+    tracing::info!(connectors = ?registry.available(), "connector registry initialised");
+
+    let initial_connector: Arc<BoxedConnector> = build_connector(&cfg.connector, &registry)?;
 
     // Wrap in a hot-swappable handle.
     let connector_handle: ConnectorHandle = Arc::new(RwLock::new(initial_connector));
@@ -124,57 +126,105 @@ fn extract_api_records(connector: &ConnectorConfig) -> (Vec<TopicRecord>, Vec<Fe
     }
 }
 
-/// Build the initial BoxedConnector from config.
-async fn build_connector(
+/// Build the default [`ConnectorRegistry`] with all built-in connector types.
+fn default_registry() -> ConnectorRegistry {
+    let mut registry = ConnectorRegistry::new();
+    registry.register(RssConnectorFactory);
+    registry.register(StaticConnectorFactory);
+    registry
+}
+
+/// Build the initial BoxedConnector from config using the plugin registry.
+fn build_connector(
     connector_cfg: &ConnectorConfig,
-    cli_config: Option<&str>,
+    registry: &ConnectorRegistry,
 ) -> anyhow::Result<Arc<BoxedConnector>> {
     match connector_cfg {
-        ConnectorConfig::Static { path } if !path.as_os_str().is_empty() => {
-            tracing::info!(path = %path.display(), "loading static connector");
-            Ok(Arc::new(BoxedConnector::new(
-                StaticConnector::from_file(path)
-                    .map_err(|e| anyhow::anyhow!("failed to load '{}': {e}", path.display()))?,
-            )))
-        }
-        ConnectorConfig::Rss { feeds } => {
-            tracing::info!(feeds = feeds.len(), "loading RSS connector");
-            let rss_feeds = feeds
-                .iter()
-                .map(|f| RssFeedConfig {
-                    topic_id: f.topic_id.clone(),
-                    topic_label: f.topic_label.clone(),
-                    topic_description: f.topic_description.clone(),
-                    topic_tags: f.topic_tags.clone(),
-                    url: f.url.clone(),
-                    refresh_minutes: f.refresh_minutes,
-                })
-                .collect();
-            let connector = Arc::new(RssConnector::new(rss_feeds));
-            let boxed = Arc::new(BoxedConnector::new(connector.as_ref().clone()));
-            // Spawn auto-refresh background task.
-            let _refresh_handle = connector.start_auto_refresh();
-            Ok(boxed)
-        }
-        _ => {
-            // No config or empty static path — try env var then embedded sample.
-            let _ = cli_config; // unused in this branch
+        // Empty static path = no real config → fallback to env var / embedded sample.
+        ConnectorConfig::Static { path } if path.as_os_str().is_empty() => {
             match std::env::var("FERRISLETTER_DATA") {
                 Ok(path) => {
                     tracing::info!(path, "loading static connector from FERRISLETTER_DATA");
-                    Ok(Arc::new(BoxedConnector::new(
-                        StaticConnector::from_file(&path)
-                            .map_err(|e| anyhow::anyhow!("failed to load '{path}': {e}"))?,
-                    )))
+                    let toml_val = toml::Value::Table({
+                        let mut t = toml::map::Map::new();
+                        t.insert("type".into(), toml::Value::String("static".into()));
+                        t.insert("path".into(), toml::Value::String(path));
+                        t
+                    });
+                    Ok(Arc::new(registry.create("static", &toml_val)?))
                 }
                 Err(_) => {
                     tracing::info!("using embedded sample data");
                     Ok(Arc::new(BoxedConnector::new(
-                        StaticConnector::from_json(SAMPLE_DATA)
+                        ferrisletter_connector_static::StaticConnector::from_json(SAMPLE_DATA)
                             .expect("embedded sample data must be valid"),
                     )))
                 }
             }
         }
+        // Real config — serialize to TOML value and dispatch through the registry.
+        _ => {
+            let type_name = match connector_cfg {
+                ConnectorConfig::Static { .. } => "static",
+                ConnectorConfig::Rss { .. } => "rss",
+            };
+
+            tracing::info!(
+                connector_type = type_name,
+                "building connector via registry"
+            );
+
+            // Re-serialize the typed config to a toml::Value for the factory.
+            let toml_value = connector_config_to_toml(connector_cfg);
+            Ok(Arc::new(registry.create(type_name, &toml_value)?))
+        }
     }
+}
+
+/// Convert a typed [`ConnectorConfig`] into a [`toml::Value`] table for factory dispatch.
+fn connector_config_to_toml(cfg: &ConnectorConfig) -> toml::Value {
+    let mut table = toml::map::Map::new();
+    match cfg {
+        ConnectorConfig::Static { path } => {
+            table.insert("type".into(), toml::Value::String("static".into()));
+            table.insert(
+                "path".into(),
+                toml::Value::String(path.display().to_string()),
+            );
+        }
+        ConnectorConfig::Rss { feeds } => {
+            table.insert("type".into(), toml::Value::String("rss".into()));
+            let feeds_arr: Vec<toml::Value> = feeds
+                .iter()
+                .map(|f| {
+                    let mut ft = toml::map::Map::new();
+                    ft.insert("topic_id".into(), toml::Value::String(f.topic_id.clone()));
+                    ft.insert(
+                        "topic_label".into(),
+                        toml::Value::String(f.topic_label.clone()),
+                    );
+                    ft.insert(
+                        "topic_description".into(),
+                        toml::Value::String(f.topic_description.clone()),
+                    );
+                    ft.insert(
+                        "topic_tags".into(),
+                        toml::Value::Array(
+                            f.topic_tags
+                                .iter()
+                                .map(|t| toml::Value::String(t.clone()))
+                                .collect(),
+                        ),
+                    );
+                    ft.insert("url".into(), toml::Value::String(f.url.clone()));
+                    if let Some(mins) = f.refresh_minutes {
+                        ft.insert("refresh_minutes".into(), toml::Value::Integer(mins as i64));
+                    }
+                    toml::Value::Table(ft)
+                })
+                .collect();
+            table.insert("feeds".into(), toml::Value::Array(feeds_arr));
+        }
+    }
+    toml::Value::Table(table)
 }
