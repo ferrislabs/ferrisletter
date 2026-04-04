@@ -37,9 +37,15 @@ async fn main() -> anyhow::Result<()> {
     // Seed the API state from the config so the REST API reflects the initial feeds.
     let (initial_topics, initial_feeds) = extract_api_records(&cfg.connector);
 
+    // Health/readiness state for container orchestrators.
+    let server_state = ferrisletter_server::ServerState::new();
+
     // Build the initial connector.
     let initial_connector: Arc<BoxedConnector> =
         build_connector(&cfg.connector, cli_config.as_deref()).await?;
+
+    // Mark server as ready now that the connector is loaded.
+    server_state.set_ready();
 
     // Wrap in a hot-swappable handle.
     let connector_handle: ConnectorHandle = Arc::new(RwLock::new(initial_connector));
@@ -85,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
             let sse_config = SseConfig {
                 public_url: cfg.transport.public_url,
             };
-            transport::serve_sse(mcp_server, addr, &sse_config).await?;
+            transport::serve_sse(mcp_server, addr, &sse_config, server_state).await?;
         }
         TransportMode::Stdio => {
             transport::serve_stdio(mcp_server).await?;
