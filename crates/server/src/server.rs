@@ -145,6 +145,7 @@ impl FerrislletterServer {
         description = "List available newsletter topics and their descriptions. \
         Call this first to discover what content is available."
     )]
+    #[tracing::instrument(skip(self), name = "tool:list_topics")]
     async fn ferrisletter_list_topics(&self) -> Result<CallToolResult, ErrorData> {
         let topics = self
             .conn()
@@ -167,6 +168,7 @@ impl FerrislletterServer {
         Filter by topic or limit the count. \
         Use `ferrisletter_get_item` to read the full text of anything interesting."
     )]
+    #[tracing::instrument(skip(self), name = "tool:get_latest")]
     async fn ferrisletter_get_latest(
         &self,
         Parameters(params): Parameters<GetLatestParams>,
@@ -196,6 +198,7 @@ impl FerrislletterServer {
         description = "Get the full body text, links, and metadata for a specific newsletter item \
         by its ID. IDs come from `ferrisletter_get_latest` or `ferrisletter_search`."
     )]
+    #[tracing::instrument(skip(self), name = "tool:get_item")]
     async fn ferrisletter_get_item(
         &self,
         Parameters(params): Parameters<GetItemParams>,
@@ -220,6 +223,7 @@ impl FerrislletterServer {
         An empty query with filters acts as a pure filter. \
         Returns compact item summaries — use `ferrisletter_get_item` to expand one."
     )]
+    #[tracing::instrument(skip(self), name = "tool:search")]
     async fn ferrisletter_search(
         &self,
         Parameters(params): Parameters<SearchParams>,
@@ -261,6 +265,7 @@ impl FerrislletterServer {
         Perfect for 'what did I miss this week?' queries. \
         Returns compact headlines — use `ferrisletter_get_item` to dig into anything."
     )]
+    #[tracing::instrument(skip(self), name = "tool:recap")]
     async fn ferrisletter_recap(
         &self,
         Parameters(params): Parameters<RecapParams>,
