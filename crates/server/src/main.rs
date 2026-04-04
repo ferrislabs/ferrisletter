@@ -16,23 +16,18 @@ const SAMPLE_DATA: &str = include_str!("../data/sample.json");
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // MCP stdio transport uses stdout for the protocol — send logs to stderr.
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
-        )
-        .init();
-
-    tracing::info!("ferrisletter v{} starting", env!("CARGO_PKG_VERSION"));
-
     // `--config <path>` CLI arg takes precedence over everything else.
     let cli_config: Option<String> = std::env::args().skip_while(|a| a != "--config").nth(1);
 
     let cfg = config::load(cli_config.as_deref())
         .map_err(|e| anyhow::anyhow!("{e}"))?
         .unwrap_or_default();
+
+    // Initialise tracing — with optional OpenTelemetry layer.
+    // MCP stdio transport uses stdout for the protocol, so logs go to stderr.
+    init_tracing(&cfg)?;
+
+    tracing::info!("ferrisletter v{} starting", env!("CARGO_PKG_VERSION"));
 
     // Seed the API state from the config so the REST API reflects the initial feeds.
     let (initial_topics, initial_feeds) = extract_api_records(&cfg.connector);
@@ -93,6 +88,51 @@ async fn main() -> anyhow::Result<()> {
             transport::serve_stdio(mcp_server).await?;
         }
     }
+
+    #[cfg(feature = "telemetry")]
+    if cfg.telemetry.enabled {
+        ferrisletter_server::telemetry::shutdown();
+    }
+
+    Ok(())
+}
+
+/// Initialise the tracing subscriber, optionally layering OpenTelemetry on top.
+fn init_tracing(
+    #[allow(unused_variables)] cfg: &ferrisletter_server::Config,
+) -> anyhow::Result<()> {
+    let env_filter = tracing_subscriber::EnvFilter::from_default_env()
+        .add_directive(tracing::Level::INFO.into());
+
+    #[cfg(feature = "telemetry")]
+    if cfg.telemetry.enabled {
+        use tracing_subscriber::layer::SubscriberExt;
+        use tracing_subscriber::util::SubscriberInitExt;
+
+        let otel_layer = ferrisletter_server::telemetry::init(&cfg.telemetry)
+            .map_err(|e| anyhow::anyhow!("failed to initialise OpenTelemetry: {e}"))?;
+
+        let fmt_layer = tracing_subscriber::fmt::layer().with_writer(std::io::stderr);
+
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(fmt_layer)
+            .with(otel_layer)
+            .init();
+
+        tracing::info!(
+            endpoint = %cfg.telemetry.endpoint,
+            service = %cfg.telemetry.service_name,
+            "OpenTelemetry enabled"
+        );
+        return Ok(());
+    }
+
+    // Default: plain fmt subscriber to stderr.
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(env_filter)
+        .init();
 
     Ok(())
 }
