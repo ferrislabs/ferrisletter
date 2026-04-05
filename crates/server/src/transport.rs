@@ -18,6 +18,7 @@ use rmcp::transport::streamable_http_server::{
 use tokio_util::sync::CancellationToken;
 use tower_http::cors::{Any, CorsLayer};
 
+use crate::health;
 use crate::server::FerrislletterServer;
 
 /// Default graceful shutdown timeout.
@@ -61,6 +62,7 @@ pub async fn serve_sse(
     server: FerrislletterServer,
     addr: SocketAddr,
     config: &SseConfig,
+    server_state: crate::health::ServerState,
 ) -> anyhow::Result<()> {
     tracing::info!(%addr, "serving MCP over streamable HTTP");
 
@@ -101,6 +103,8 @@ pub async fn serve_sse(
         .allow_headers(Any);
 
     let mut router = axum::Router::new()
+        .route("/healthz", get(health::healthz))
+        .route("/readyz", get(health::readyz).with_state(server_state))
         .nest_service("/mcp", service.clone())
         .fallback_service(service);
 
