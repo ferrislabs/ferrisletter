@@ -26,6 +26,9 @@ pub struct Config {
 
     #[serde(default)]
     pub ui: UiConfig,
+
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
 }
 
 // --- Admin REST API ---
@@ -152,6 +155,51 @@ pub struct FeedConfig {
     pub refresh_minutes: Option<u64>,
 }
 
+// --- Telemetry ---
+
+/// OpenTelemetry configuration.
+///
+/// Requires the `telemetry` Cargo feature to be enabled at compile time.
+/// When both the feature and `enabled = true` are set, the server exports
+/// traces via OTLP to the configured endpoint.
+///
+/// ```toml
+/// [telemetry]
+/// enabled = true
+/// endpoint = "http://localhost:4317"
+/// service_name = "ferrisletter"
+/// ```
+#[derive(Debug, Deserialize, Clone)]
+pub struct TelemetryConfig {
+    /// Enable OpenTelemetry export. Requires the `telemetry` feature.
+    #[serde(default)]
+    pub enabled: bool,
+    /// OTLP gRPC endpoint for the collector.
+    #[serde(default = "default_otlp_endpoint")]
+    pub endpoint: String,
+    /// Service name reported to the collector.
+    #[serde(default = "default_service_name")]
+    pub service_name: String,
+}
+
+impl Default for TelemetryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint: default_otlp_endpoint(),
+            service_name: default_service_name(),
+        }
+    }
+}
+
+fn default_otlp_endpoint() -> String {
+    "http://localhost:4317".to_string()
+}
+
+fn default_service_name() -> String {
+    "ferrisletter".to_string()
+}
+
 // --- Loading ---
 
 /// Errors that can occur when loading a config file.
@@ -258,5 +306,27 @@ mod tests {
     fn defaults_to_stdio_when_transport_omitted() {
         let config: Config = toml::from_str("").unwrap();
         assert_eq!(config.transport.mode, TransportMode::Stdio);
+    }
+
+    #[test]
+    fn parses_telemetry_config() {
+        let toml = r#"
+            [telemetry]
+            enabled = true
+            endpoint = "http://collector:4317"
+            service_name = "my-ferrisletter"
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(config.telemetry.enabled);
+        assert_eq!(config.telemetry.endpoint, "http://collector:4317");
+        assert_eq!(config.telemetry.service_name, "my-ferrisletter");
+    }
+
+    #[test]
+    fn telemetry_defaults_when_omitted() {
+        let config: Config = toml::from_str("").unwrap();
+        assert!(!config.telemetry.enabled);
+        assert_eq!(config.telemetry.endpoint, "http://localhost:4317");
+        assert_eq!(config.telemetry.service_name, "ferrisletter");
     }
 }

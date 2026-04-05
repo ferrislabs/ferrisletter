@@ -36,7 +36,8 @@ use std::path::Path;
 
 use chrono::{DateTime, Utc};
 use ferrisletter_connector::{
-    Connector, ConnectorError, Item, ItemDetail, SearchFilters, Topic, UserPrefs,
+    BoxedConnector, Connector, ConnectorError, ConnectorFactory, Item, ItemDetail, SearchFilters,
+    Topic, UserPrefs,
 };
 
 /// Error returned when constructing a [`StaticConnector`] from disk or a string.
@@ -186,6 +187,40 @@ impl Connector for StaticConnector {
         }
 
         Ok(items)
+    }
+}
+
+/// Factory for creating [`StaticConnector`] instances from TOML configuration.
+///
+/// Expects the `[connector]` table to contain a `path` string pointing to a
+/// JSON data file.
+///
+/// # Config example
+///
+/// ```toml
+/// [connector]
+/// type = "static"
+/// path = "data/newsletter.json"
+/// ```
+pub struct StaticConnectorFactory;
+
+impl ConnectorFactory for StaticConnectorFactory {
+    fn connector_type(&self) -> &str {
+        "static"
+    }
+
+    fn create(&self, config: &toml::Value) -> Result<BoxedConnector, ConnectorError> {
+        let path = config.get("path").and_then(|v| v.as_str()).unwrap_or("");
+
+        if path.is_empty() {
+            return Err(ConnectorError::Other(
+                "static connector requires a non-empty 'path'".into(),
+            ));
+        }
+
+        StaticConnector::from_file(path)
+            .map(BoxedConnector::new)
+            .map_err(|e| ConnectorError::Other(Box::new(e)))
     }
 }
 

@@ -1,12 +1,16 @@
 [package]
 name = "ferrisletter-connector"
-description = "Connector trait and types for Ferrisletter content sources"
+description = "Connector SDK for building Ferrisletter newsletter sources — trait definitions, types, and plugin registry"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+keywords = ["mcp", "newsletter", "connector", "plugin"]
+categories = ["api-bindings", "asynchronous"]
+readme = "README.md"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "2"
+toml = "0.8"
