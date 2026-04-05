@@ -17,6 +17,7 @@ use rmcp::transport::streamable_http_server::{
 use tokio_util::sync::CancellationToken;
 use tower_http::cors::{Any, CorsLayer};
 
+use crate::health::{self, ServerState};
 use crate::server::FerrislletterServer;
 
 /// Configuration for the SSE/HTTP transport.
@@ -40,10 +41,14 @@ pub async fn serve_stdio(server: FerrislletterServer) -> anyhow::Result<()> {
 }
 
 /// Start the MCP server over SSE/HTTP transport.
+///
+/// The `server_state` is used for health and readiness probes (`/healthz`,
+/// `/readyz`) that container orchestrators can poll.
 pub async fn serve_sse(
     server: FerrislletterServer,
     addr: SocketAddr,
     config: &SseConfig,
+    server_state: ServerState,
 ) -> anyhow::Result<()> {
     tracing::info!(%addr, "serving MCP over streamable HTTP");
 
@@ -64,6 +69,8 @@ pub async fn serve_sse(
         .allow_headers(Any);
 
     let mut router = axum::Router::new()
+        .route("/healthz", get(health::healthz))
+        .route("/readyz", get(health::readyz).with_state(server_state))
         .nest_service("/mcp", service.clone())
         .fallback_service(service);
 
