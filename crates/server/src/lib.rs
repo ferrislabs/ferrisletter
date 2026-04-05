@@ -30,9 +30,11 @@ pub mod api;
 pub mod config;
 pub mod health;
 pub mod server;
+#[cfg(feature = "telemetry")]
+pub mod telemetry;
 pub mod transport;
 
-pub use config::{AdminConfig, Config, ConnectorConfig, TransportMode, UiConfig};
+pub use config::{AdminConfig, Config, ConnectorConfig, TelemetryConfig, TransportMode, UiConfig};
 pub use health::ServerState;
 pub use server::{FerrislletterServer, UI_RESOURCE_URI};
 pub use transport::{serve_sse, serve_stdio};

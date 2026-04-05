@@ -14,6 +14,15 @@ path = "src/lib.rs"
 name = "ferrisletter-server"
 path = "src/main.rs"
 
+[features]
+default = []
+telemetry = [
+    "dep:opentelemetry",
+    "dep:opentelemetry_sdk",
+    "dep:opentelemetry-otlp",
+    "dep:tracing-opentelemetry",
+]
+
 [dependencies]
 ferrisletter-connector = { path = "../connector" }
 ferrisletter-connector-rss = { path = "../connector-rss" }
@@ -33,3 +42,9 @@ tokio-util = "0.7"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
+
+# Optional: OpenTelemetry instrumentation (behind `telemetry` feature flag)
+opentelemetry = { version = "0.31", optional = true }
+opentelemetry_sdk = { version = "0.31", features = ["rt-tokio"], optional = true }
+opentelemetry-otlp = { version = "0.31", features = ["grpc-tonic"], optional = true }
+tracing-opentelemetry = { version = "0.32", optional = true }
