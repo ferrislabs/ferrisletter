@@ -87,6 +87,10 @@ async fn main() -> anyhow::Result<()> {
                 format!("{}:{}", cfg.transport.host, cfg.transport.port).parse()?;
             let sse_config = SseConfig {
                 public_url: cfg.transport.public_url,
+                shutdown_timeout: cfg
+                    .transport
+                    .shutdown_timeout_seconds
+                    .map(std::time::Duration::from_secs),
             };
             transport::serve_sse(mcp_server, addr, &sse_config, server_state).await?;
         }

@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use axum::{
     Json,
@@ -20,30 +21,44 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::health::{self, ServerState};
 use crate::server::FerrislletterServer;
 
+/// Default graceful shutdown timeout.
+const DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Configuration for the SSE/HTTP transport.
 pub struct SseConfig {
     /// Optional public base URL for OAuth stub endpoints (e.g. `https://abc.ngrok-free.app`).
     pub public_url: Option<String>,
+    /// Graceful shutdown timeout. Defaults to 30 seconds.
+    pub shutdown_timeout: Option<Duration>,
 }
 
 /// Start the MCP server over stdio transport.
+///
+/// Handles SIGINT (Ctrl+C) for clean shutdown.
 pub async fn serve_stdio(server: FerrislletterServer) -> anyhow::Result<()> {
     tracing::info!("serving MCP over stdio");
     let service = server
         .serve(stdio())
         .await
         .inspect_err(|e| tracing::error!("failed to start server: {e}"))?;
-    service
-        .waiting()
-        .await
-        .inspect_err(|e| tracing::error!("server error: {e}"))?;
+
+    tokio::select! {
+        result = service.waiting() => {
+            result.inspect_err(|e| tracing::error!("server error: {e}"))?;
+        }
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("received SIGINT, shutting down");
+        }
+    }
+
     Ok(())
 }
 
 /// Start the MCP server over SSE/HTTP transport.
 ///
-/// The `server_state` is used for health and readiness probes (`/healthz`,
-/// `/readyz`) that container orchestrators can poll.
+/// Listens for SIGTERM and SIGINT to initiate graceful shutdown, draining
+/// in-flight connections before exiting. The `server_state` is used for
+/// health and readiness probes (`/healthz`, `/readyz`).
 pub async fn serve_sse(
     server: FerrislletterServer,
     addr: SocketAddr,
@@ -53,6 +68,26 @@ pub async fn serve_sse(
     tracing::info!(%addr, "serving MCP over streamable HTTP");
 
     let ct = CancellationToken::new();
+    let shutdown_timeout = config.shutdown_timeout.unwrap_or(DEFAULT_SHUTDOWN_TIMEOUT);
+
+    // Listen for SIGTERM/SIGINT to trigger graceful shutdown.
+    let shutdown_ct = ct.clone();
+    tokio::spawn(async move {
+        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to register SIGTERM handler");
+
+        tokio::select! {
+            _ = sigterm.recv() => {
+                tracing::info!("received SIGTERM, initiating graceful shutdown");
+            }
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("received SIGINT, initiating graceful shutdown");
+            }
+        }
+
+        shutdown_ct.cancel();
+    });
+
     let service: StreamableHttpService<FerrislletterServer, LocalSessionManager> =
         StreamableHttpService::new(
             {
@@ -83,8 +118,13 @@ pub async fn serve_sse(
     let router = router.layer(cors);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, router)
-        .with_graceful_shutdown(async move { ct.cancelled_owned().await })
+        .with_graceful_shutdown(async move {
+            ct.cancelled_owned().await;
+            tracing::info!(timeout = ?shutdown_timeout, "draining connections...");
+        })
         .await?;
+
+    tracing::info!("shutdown complete");
     Ok(())
 }
 

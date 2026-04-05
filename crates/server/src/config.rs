@@ -89,6 +89,9 @@ pub struct TransportConfig {
     /// Required when mode = "sse" and connecting from claude.ai.
     #[serde(default)]
     pub public_url: Option<String>,
+    /// Graceful shutdown timeout in seconds. Defaults to 30.
+    #[serde(default)]
+    pub shutdown_timeout_seconds: Option<u64>,
 }
 
 impl Default for TransportConfig {
@@ -98,6 +101,7 @@ impl Default for TransportConfig {
             host: default_host(),
             port: default_port(),
             public_url: None,
+            shutdown_timeout_seconds: None,
         }
     }
 }
