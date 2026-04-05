@@ -18,7 +18,7 @@ use rmcp::transport::streamable_http_server::{
 use tokio_util::sync::CancellationToken;
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::health;
+use crate::health::{self, ServerState};
 use crate::server::FerrislletterServer;
 
 /// Default graceful shutdown timeout.
@@ -57,12 +57,13 @@ pub async fn serve_stdio(server: FerrislletterServer) -> anyhow::Result<()> {
 /// Start the MCP server over SSE/HTTP transport.
 ///
 /// Listens for SIGTERM and SIGINT to initiate graceful shutdown, draining
-/// in-flight connections before exiting.
+/// in-flight connections before exiting. The `server_state` is used for
+/// health and readiness probes (`/healthz`, `/readyz`).
 pub async fn serve_sse(
     server: FerrislletterServer,
     addr: SocketAddr,
     config: &SseConfig,
-    server_state: crate::health::ServerState,
+    server_state: ServerState,
 ) -> anyhow::Result<()> {
     tracing::info!(%addr, "serving MCP over streamable HTTP");
 
