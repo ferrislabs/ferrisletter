@@ -1,9 +1,12 @@
 //! Ferrisletter MCP server — tool definitions and handler.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use chrono::DateTime;
-use ferrisletter_connector::{BoxedConnector, Connector, SearchFilters, UserPrefs};
+use ferrisletter_connector::{
+    BoxedConnector, Connector, Item, ItemDetail, Link, SearchFilters, Topic, UserPrefs,
+};
 use rmcp::{
     ErrorData, ServerHandler,
     handler::server::{router::tool::ToolRouter, tool::ToolCallContext, wrapper::Parameters},
@@ -14,7 +17,7 @@ use rmcp::{
         ServerCapabilities, ServerInfo, Tool,
     },
     schemars,
-    service::RequestContext,
+    service::{NotificationContext, RequestContext},
     tool, tool_router,
 };
 use serde::Deserialize;
@@ -34,8 +37,11 @@ const UI_BUNDLE: &str = include_str!(concat!(env!("OUT_DIR"), "/ui_bundle.html")
 #[derive(Clone)]
 pub struct FerrislletterServer {
     connector: ConnectorHandle,
-    /// Whether the MCP App UI resource is enabled.
+    /// Whether the MCP App UI resource is enabled in config.
     pub ui_enabled: bool,
+    /// Whether the connected client supports the MCP-UI extension.
+    /// Set during the MCP initialization handshake.
+    client_supports_ui: Arc<AtomicBool>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -44,6 +50,7 @@ impl FerrislletterServer {
         Self {
             connector,
             ui_enabled,
+            client_supports_ui: Arc::new(AtomicBool::new(false)),
             tool_router: Self::tool_router(),
         }
     }
@@ -51,6 +58,14 @@ impl FerrislletterServer {
     /// Borrow the active connector for one request.
     async fn conn(&self) -> Arc<BoxedConnector> {
         self.connector.read().await.clone()
+    }
+
+    /// Whether the current session should use UI-annotated responses.
+    ///
+    /// True only when UI is enabled in config AND the client advertised
+    /// support for `io.modelcontextprotocol/ui` during initialization.
+    fn should_use_ui(&self) -> bool {
+        self.ui_enabled && self.client_supports_ui.load(Ordering::Relaxed)
     }
 }
 
@@ -92,6 +107,68 @@ fn tool_ok_ui(json: String, item_count: usize, label: &str) -> CallToolResult {
     );
     CallToolResult::success(vec![Content::text(note), Content::text(json)])
         .with_meta(Some(ui_result_meta()))
+}
+
+// --- Rich text formatting for non-UI clients ---
+
+/// Format a list of topics as human-readable text.
+fn format_topics_text(topics: &[Topic]) -> String {
+    let mut out = format!("{} topic(s) available:\n", topics.len());
+    for t in topics {
+        out.push_str(&format!("\n- **{}**: {}", t.label, t.description));
+        if !t.tags.is_empty() {
+            out.push_str(&format!(" ({})", t.tags.join(", ")));
+        }
+    }
+    out
+}
+
+/// Format a list of items as human-readable text.
+fn format_items_text(items: &[Item], label: &str) -> String {
+    if items.is_empty() {
+        return format!("No {label} found.");
+    }
+    let mut out = format!("{} {}:\n", items.len(), label);
+    for (i, item) in items.iter().enumerate() {
+        let date = item.published.format("%Y-%m-%d");
+        out.push_str(&format!("\n{}. **{}**", i + 1, item.headline));
+        out.push_str(&format!("\n   {} | {}", item.source, date));
+        if !item.summary.is_empty() {
+            // Truncate long summaries for the compact list view.
+            let summary = if item.summary.len() > 200 {
+                format!("{}...", &item.summary[..200])
+            } else {
+                item.summary.clone()
+            };
+            out.push_str(&format!("\n   {summary}"));
+        }
+        if !item.tags.is_empty() {
+            out.push_str(&format!("\n   Tags: {}", item.tags.join(", ")));
+        }
+    }
+    out
+}
+
+/// Format a single item detail as human-readable text.
+fn format_detail_text(detail: &ItemDetail) -> String {
+    let item = &detail.item;
+    let date = item.published.format("%Y-%m-%d %H:%M UTC");
+    let mut out = format!("**{}**\n", item.headline);
+    out.push_str(&format!(
+        "Source: {} | Published: {} | Read time: {}\n",
+        item.source, date, detail.read_time
+    ));
+    if !item.tags.is_empty() {
+        out.push_str(&format!("Tags: {}\n", item.tags.join(", ")));
+    }
+    out.push_str(&format!("\n{}", detail.body));
+    if !detail.links.is_empty() {
+        out.push_str("\n\nLinks:");
+        for Link { url, label } in &detail.links {
+            out.push_str(&format!("\n- [{label}]({url})"));
+        }
+    }
+    out
 }
 
 // --- Tool parameter types ---
@@ -154,12 +231,13 @@ impl FerrislletterServer {
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         let count = topics.len();
-        let json = serde_json::to_string_pretty(&topics)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        if self.ui_enabled {
+        if self.should_use_ui() {
+            let json = serde_json::to_string_pretty(&topics)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
             return Ok(tool_ok_ui(json, count, "topics"));
         }
-        Ok(tool_ok_text(json))
+        let text = format_topics_text(&topics);
+        Ok(tool_ok_text(text))
     }
 
     /// Get the latest items from the newsletter.
@@ -185,12 +263,13 @@ impl FerrislletterServer {
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         let count = items.len();
-        let json = serde_json::to_string_pretty(&items)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        if self.ui_enabled {
+        if self.should_use_ui() {
+            let json = serde_json::to_string_pretty(&items)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
             return Ok(tool_ok_ui(json, count, "items"));
         }
-        Ok(tool_ok_text(json))
+        let text = format_items_text(&items, "items");
+        Ok(tool_ok_text(text))
     }
 
     /// Get the full content of a specific item.
@@ -209,12 +288,13 @@ impl FerrislletterServer {
             .get_item_detail(&params.id)
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        let json = serde_json::to_string_pretty(&detail)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        if self.ui_enabled {
+        if self.should_use_ui() {
+            let json = serde_json::to_string_pretty(&detail)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
             return Ok(tool_ok_ui(json, 1, "item"));
         }
-        Ok(tool_ok_text(json))
+        let text = format_detail_text(&detail);
+        Ok(tool_ok_text(text))
     }
 
     /// Search newsletter content.
@@ -251,12 +331,13 @@ impl FerrislletterServer {
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         let count = items.len();
-        let json = serde_json::to_string_pretty(&items)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        if self.ui_enabled {
+        if self.should_use_ui() {
+            let json = serde_json::to_string_pretty(&items)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
             return Ok(tool_ok_ui(json, count, "results"));
         }
-        Ok(tool_ok_text(json))
+        let text = format_items_text(&items, "results");
+        Ok(tool_ok_text(text))
     }
 
     /// Get a recap of items published since a given date.
@@ -289,12 +370,13 @@ impl FerrislletterServer {
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
         let count = items.len();
-        let json = serde_json::to_string_pretty(&items)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        if self.ui_enabled {
+        if self.should_use_ui() {
+            let json = serde_json::to_string_pretty(&items)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
             return Ok(tool_ok_ui(json, count, "items"));
         }
-        Ok(tool_ok_text(json))
+        let text = format_items_text(&items, "items");
+        Ok(tool_ok_text(text))
     }
 }
 
@@ -329,6 +411,25 @@ impl ServerHandler for FerrislletterServer {
             )
     }
 
+    /// Detect client UI capability after the MCP handshake completes.
+    async fn on_initialized(&self, context: NotificationContext<rmcp::RoleServer>) {
+        let supports_ui = context
+            .peer
+            .peer_info()
+            .and_then(|info| info.capabilities.extensions.as_ref())
+            .map(|ext| ext.contains_key("io.modelcontextprotocol/ui"))
+            .unwrap_or(false);
+
+        self.client_supports_ui
+            .store(supports_ui, Ordering::Relaxed);
+
+        if supports_ui {
+            tracing::info!("client supports MCP-UI extension");
+        } else {
+            tracing::info!("client does not support MCP-UI, using text responses");
+        }
+    }
+
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
@@ -348,7 +449,7 @@ impl ServerHandler for FerrislletterServer {
             .list_all()
             .into_iter()
             .map(|mut t| {
-                if self.ui_enabled {
+                if self.should_use_ui() {
                     t.meta = Some(ui_tool_meta());
                 }
                 t
@@ -411,5 +512,83 @@ impl ServerHandler for FerrislletterServer {
             ResourceContents::text(UI_BUNDLE, UI_RESOURCE_URI)
                 .with_mime_type("text/html;profile=mcp-app"),
         ]))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_topics_produces_readable_output() {
+        let topics = vec![
+            Topic {
+                id: "rust".into(),
+                label: "Rust".into(),
+                description: "Rust programming news".into(),
+                tags: vec!["rust".into(), "programming".into()],
+            },
+            Topic {
+                id: "ai".into(),
+                label: "AI".into(),
+                description: "Artificial intelligence updates".into(),
+                tags: vec![],
+            },
+        ];
+        let text = format_topics_text(&topics);
+        assert!(text.contains("2 topic(s)"));
+        assert!(text.contains("**Rust**"));
+        assert!(text.contains("rust, programming"));
+        assert!(text.contains("**AI**"));
+    }
+
+    #[test]
+    fn format_items_produces_numbered_list() {
+        let items = vec![Item {
+            id: "1".into(),
+            topic_id: "rust".into(),
+            headline: "Rust 2024 ships".into(),
+            summary: "The new edition is here.".into(),
+            tags: vec!["rust".into()],
+            source: "blog.rust-lang.org".into(),
+            published: chrono::Utc::now(),
+        }];
+        let text = format_items_text(&items, "items");
+        assert!(text.contains("1 items"));
+        assert!(text.contains("1. **Rust 2024 ships**"));
+        assert!(text.contains("blog.rust-lang.org"));
+        assert!(text.contains("Tags: rust"));
+    }
+
+    #[test]
+    fn format_items_empty_returns_no_items() {
+        let text = format_items_text(&[], "results");
+        assert_eq!(text, "No results found.");
+    }
+
+    #[test]
+    fn format_detail_includes_body_and_links() {
+        let detail = ItemDetail {
+            item: Item {
+                id: "1".into(),
+                topic_id: "rust".into(),
+                headline: "Big Release".into(),
+                summary: "Summary here".into(),
+                tags: vec!["release".into()],
+                source: "example.com".into(),
+                published: chrono::Utc::now(),
+            },
+            body: "Full article body text.".into(),
+            links: vec![Link {
+                url: "https://example.com".into(),
+                label: "Read more".into(),
+            }],
+            read_time: "3 min".into(),
+        };
+        let text = format_detail_text(&detail);
+        assert!(text.contains("**Big Release**"));
+        assert!(text.contains("Read time: 3 min"));
+        assert!(text.contains("Full article body text."));
+        assert!(text.contains("[Read more](https://example.com)"));
     }
 }
