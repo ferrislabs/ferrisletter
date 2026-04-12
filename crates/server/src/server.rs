@@ -171,6 +171,44 @@ fn format_detail_text(detail: &ItemDetail) -> String {
     out
 }
 
+// --- Delivery setup helpers ---
+
+const DEFAULT_DELIVERY_PROMPT: &str = "\
+Check my newsletter for new items since yesterday. \
+Call ferrisletter_recap with since set to 24 hours ago. \
+Summarize the headlines — for each item include the title, source, and a one-line summary. \
+If there are more than 10 items, focus on the top 5 most interesting ones.";
+
+fn generate_cron(frequency: &str, time: &str, day: &str) -> String {
+    let parts: Vec<&str> = time.split(':').collect();
+    let hour = parts
+        .first()
+        .and_then(|h| h.parse::<u32>().ok())
+        .unwrap_or(9);
+    let minute = parts
+        .get(1)
+        .and_then(|m| m.parse::<u32>().ok())
+        .unwrap_or(0);
+
+    match frequency {
+        "weekdays" => format!("{minute} {hour} * * 1-5"),
+        "weekly" => {
+            let dow = match day.to_lowercase().as_str() {
+                "monday" | "mon" => 1,
+                "tuesday" | "tue" => 2,
+                "wednesday" | "wed" => 3,
+                "thursday" | "thu" => 4,
+                "friday" | "fri" => 5,
+                "saturday" | "sat" => 6,
+                "sunday" | "sun" => 0,
+                _ => 1,
+            };
+            format!("{minute} {hour} * * {dow}")
+        }
+        _ => format!("{minute} {hour} * * *"), // daily
+    }
+}
+
 // --- Tool parameter types ---
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -211,6 +249,16 @@ pub struct RecapParams {
     pub topics: Option<Vec<String>>,
     /// Maximum number of items to return.
     pub max_items: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SetupDeliveryParams {
+    /// Delivery frequency: "daily", "weekdays", or "weekly".
+    pub frequency: Option<String>,
+    /// Preferred delivery time (HH:MM, 24h format). Defaults to "09:00".
+    pub time: Option<String>,
+    /// Preferred day for weekly delivery (e.g. "monday"). Only used when frequency is "weekly".
+    pub day: Option<String>,
 }
 
 // --- Tools ---
@@ -377,6 +425,39 @@ impl FerrislletterServer {
         }
         let text = format_items_text(&items, "items");
         Ok(tool_ok_text(text))
+    }
+
+    /// Help set up scheduled delivery of the newsletter digest.
+    #[tool(
+        description = "Help set up scheduled delivery of the newsletter digest. \
+        Returns a suggested cron expression and prompt for the LLM client's scheduler. \
+        Supports daily, weekday, or weekly delivery."
+    )]
+    #[tracing::instrument(skip(self), name = "tool:setup_delivery")]
+    async fn ferrisletter_setup_delivery(
+        &self,
+        Parameters(params): Parameters<SetupDeliveryParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let freq = params.frequency.as_deref().unwrap_or("daily");
+        let time = params.time.as_deref().unwrap_or("09:00");
+        let day = params.day.as_deref().unwrap_or("monday");
+
+        let cron = generate_cron(freq, time, day);
+        let prompt = DEFAULT_DELIVERY_PROMPT;
+
+        let resp = serde_json::json!({
+            "suggested_cron": cron,
+            "suggested_prompt": prompt,
+            "instructions": "To set this up in Claude, create a scheduled task with the cron expression and prompt above."
+        });
+
+        let json = serde_json::to_string_pretty(&resp)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        if self.should_use_ui() {
+            return Ok(tool_ok_ui(json, 1, "delivery setup"));
+        }
+        Ok(tool_ok_text(json))
     }
 }
 
