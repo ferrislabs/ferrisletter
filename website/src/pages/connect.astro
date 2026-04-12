@@ -1,0 +1,127 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav';
+import PageHeader from '../components/PageHeader.astro';
+import CodeBlock from '../components/CodeBlock';
+import Footer from '../components/Footer.astro';
+
+const configJson = `{
+  "mcpServers": {
+    "lattice": {
+      "command": "npx",
+      "args": ["mcp-remote@latest", "https://mcp.ferrisletter.dev/mcp"]
+    }
+  }
+}`;
+---
+
+<Layout title="Connect — Ferrisletter" description="Get connected to Ferrisletter in 30 seconds with a simple config snippet.">
+  <Nav client:load />
+  <div class="max-w-[800px] mx-auto px-8">
+    <PageHeader
+      tag="Connect"
+      title="Connect to Ferrisletter in 30 seconds"
+      subtitle="Add Lattice to Claude Desktop with a single config snippet. No install, no build, no signup."
+    />
+
+    <!-- Prerequisites -->
+    <section class="mb-12" data-reveal>
+      <h2 class="text-xl font-bold tracking-tight mb-4">Prerequisites</h2>
+      <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl p-5">
+        <ul class="space-y-2 text-sm text-[var(--color-text-muted)]">
+          <li class="flex items-start gap-2">
+            <span class="text-[var(--color-accent)] mt-0.5">&#10003;</span>
+            <span><strong class="text-[var(--color-text)]">Node.js 18+</strong> — needed for npx to run mcp-remote</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-[var(--color-accent)] mt-0.5">&#10003;</span>
+            <span><strong class="text-[var(--color-text)]">Claude Desktop</strong> — Pro, Max, Team, or Enterprise plan</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Config snippet -->
+    <section class="mb-12" data-reveal>
+      <h2 class="text-xl font-bold tracking-tight mb-4">1. Copy the config</h2>
+      <CodeBlock code={configJson} filename="claude_desktop_config.json" client:load />
+    </section>
+
+    <!-- Config file location -->
+    <section class="mb-12" data-reveal>
+      <h2 class="text-xl font-bold tracking-tight mb-4">2. Open your config file</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl p-5">
+          <span class="inline-block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-dim)] mb-2">macOS</span>
+          <code class="block font-mono text-xs text-[var(--color-text-muted)] break-all">~/Library/Application Support/Claude/claude_desktop_config.json</code>
+        </div>
+        <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl p-5">
+          <span class="inline-block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-dim)] mb-2">Windows</span>
+          <code class="block font-mono text-xs text-[var(--color-text-muted)] break-all">%APPDATA%\Claude\claude_desktop_config.json</code>
+        </div>
+      </div>
+    </section>
+
+    <!-- Steps -->
+    <section class="mb-12" data-reveal>
+      <h2 class="text-xl font-bold tracking-tight mb-4">3. Paste and restart</h2>
+      <div class="space-y-4">
+        <div class="flex items-start gap-4">
+          <span class="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--color-tag-bg)] border border-[var(--color-tag-border)] text-sm font-bold text-[var(--color-accent)] shrink-0">1</span>
+          <div>
+            <p class="font-medium">Paste the config</p>
+            <p class="text-sm text-[var(--color-text-muted)]">If you already have other MCP servers configured, merge the <code class="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">lattice</code> entry into your existing <code class="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">mcpServers</code> object.</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-4">
+          <span class="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--color-tag-bg)] border border-[var(--color-tag-border)] text-sm font-bold text-[var(--color-accent)] shrink-0">2</span>
+          <div>
+            <p class="font-medium">Restart Claude Desktop</p>
+            <p class="text-sm text-[var(--color-text-muted)]">Quit and reopen Claude Desktop so it picks up the new config.</p>
+          </div>
+        </div>
+        <div class="flex items-start gap-4">
+          <span class="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--color-tag-bg)] border border-[var(--color-tag-border)] text-sm font-bold text-[var(--color-accent)] shrink-0">3</span>
+          <div>
+            <p class="font-medium">Ask your first question</p>
+            <p class="text-sm text-[var(--color-text-muted)]">Try: <em>"What topics are available on Lattice?"</em></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Troubleshooting -->
+    <section class="mb-16" data-reveal>
+      <h2 class="text-xl font-bold tracking-tight mb-4">Troubleshooting</h2>
+      <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl divide-y divide-[var(--color-border)]">
+        <div class="p-5">
+          <p class="font-medium text-sm mb-1">"Server not found"</p>
+          <p class="text-sm text-[var(--color-text-muted)]">Make sure Node.js 18+ is installed and <code class="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">npx</code> is available in your PATH.</p>
+        </div>
+        <div class="p-5">
+          <p class="font-medium text-sm mb-1">"Connection failed"</p>
+          <p class="text-sm text-[var(--color-text-muted)]">Verify the JSON config is valid — a missing comma or bracket will break parsing.</p>
+        </div>
+        <div class="p-5">
+          <p class="font-medium text-sm mb-1">Still stuck?</p>
+          <p class="text-sm text-[var(--color-text-muted)]">
+            <a href="https://github.com/ferrislabs/ferrisletter/issues" target="_blank" rel="noopener" class="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">Open an issue on GitHub</a> and we'll help you out.
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+  <Footer />
+</Layout>
+
+<script>
+  document.querySelectorAll('[data-reveal]').forEach((el) => {
+    el.classList.add('opacity-0', 'translate-y-6');
+    (el as HTMLElement).style.transition = 'opacity 0.7s ease-out, transform 0.7s ease-out';
+    new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        el.classList.remove('opacity-0', 'translate-y-6');
+      }
+    }, { threshold: 0.15 }).observe(el);
+  });
+</script>

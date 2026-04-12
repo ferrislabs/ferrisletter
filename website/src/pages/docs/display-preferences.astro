@@ -1,0 +1,52 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="Display Preferences" description="Customize your digest appearance with themes and natural language instructions.">
+  <h1>Display Preferences</h1>
+  <p>Customize how your digest looks — from pre-built themes to fully custom styling described in natural language.</p>
+
+  <h2>Themes</h2>
+  <p>Lattice ships with 5 built-in theme presets:</p>
+  <ul>
+    <li><strong>Default</strong> — Clean dark theme with purple accents</li>
+    <li><strong>Light</strong> — Bright white background for daytime reading</li>
+    <li><strong>Daltonian</strong> — Colorblind-safe palette using blue and orange (no red-green)</li>
+    <li><strong>High Contrast</strong> — WCAG AAA compliant with maximum readability</li>
+    <li><strong>Minimal</strong> — Headlines only, monospace font, tight spacing</li>
+  </ul>
+  <p>Preview all themes on the <a href="/themes">Themes page</a>.</p>
+  <p>To switch themes, just tell Claude:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "Switch to the light theme"
+  </blockquote>
+
+  <h2>Custom instructions</h2>
+  <p>Go beyond presets with natural language display instructions. Examples:</p>
+  <ul>
+    <li>"Use emoji headers for each section"</li>
+    <li>"Group items by tag instead of topic"</li>
+    <li>"Larger fonts with more spacing"</li>
+    <li>"Only show headlines, no summaries"</li>
+    <li>"Use a colorblind-safe palette with sans-serif fonts"</li>
+  </ul>
+  <p>These instructions are stored in your preferences and applied every time Claude generates a digest.</p>
+
+  <h2>Summary length</h2>
+  <p>Control how much detail appears in each item:</p>
+  <ul>
+    <li><strong>Brief</strong> — Headlines and source only</li>
+    <li><strong>Standard</strong> — Headlines with a one-line summary (default)</li>
+    <li><strong>Detailed</strong> — Full summaries with additional context</li>
+  </ul>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "Set my summary length to brief"
+  </blockquote>
+
+  <h2>Updating preferences</h2>
+  <p>Just tell Claude what you want to change — no settings page needed:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "Update my display preferences to use the daltonian theme with emoji headers"
+  </blockquote>
+  <p>Claude will confirm the changes and apply them to your next digest.</p>
+</DocsLayout>

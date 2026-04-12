@@ -1,0 +1,43 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+---
+
+<DocsLayout title="Scheduled Delivery" description="Set up automatic daily or weekly digest delivery.">
+  <h1>Scheduled Delivery</h1>
+  <p>Lattice can deliver your personalized digest on a schedule — daily, on weekdays, or weekly. Claude handles everything automatically.</p>
+
+  <h2>Setting up delivery</h2>
+  <p>Tell Claude when you'd like to receive your digest:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "Set up daily delivery at 9am on weekdays"
+  </blockquote>
+
+  <h3>Frequency options</h3>
+  <ul>
+    <li><strong>Daily</strong> — Every day at your chosen time</li>
+    <li><strong>Weekdays</strong> — Monday through Friday</li>
+    <li><strong>Weekly</strong> — Once a week on a specific day</li>
+  </ul>
+
+  <h2>How it works</h2>
+  <p>When your scheduled delivery fires, Claude automatically:</p>
+  <ol>
+    <li>Loads your preferences (subscribed topics, display settings, theme)</li>
+    <li>Fetches your unread feed</li>
+    <li>Generates a styled HTML digest artifact based on your preferences</li>
+    <li>Marks all delivered items as read</li>
+  </ol>
+  <p>The digest appears as an artifact in a new Claude conversation — you just open Claude and it's waiting for you.</p>
+
+  <h2>Changing frequency</h2>
+  <p>Update your schedule anytime:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "Change my delivery to weekly on Mondays at 8am"
+  </blockquote>
+
+  <h2>On-demand delivery</h2>
+  <p>You can also request a digest at any time without waiting for the schedule:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "Show me my feed" or "What did I miss this week?"
+  </blockquote>
+</DocsLayout>

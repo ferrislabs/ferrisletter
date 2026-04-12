@@ -1,0 +1,50 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import CodeBlock from '../../components/CodeBlock';
+
+const configJson = `{
+  "mcpServers": {
+    "lattice": {
+      "command": "npx",
+      "args": ["mcp-remote@latest", "https://mcp.ferrisletter.dev/mcp"]
+    }
+  }
+}`;
+---
+
+<DocsLayout title="Connect to Claude" description="Step-by-step instructions for connecting Ferrisletter to Claude Desktop.">
+  <h1>Connect to Claude</h1>
+  <p>This guide walks you through connecting Lattice to Claude Desktop using <code>mcp-remote</code>.</p>
+
+  <h2>Prerequisites</h2>
+  <ul>
+    <li><strong>Node.js 18+</strong> — needed for <code>npx</code> to run mcp-remote</li>
+    <li><strong>Claude Desktop</strong> — requires a Pro, Max, Team, or Enterprise plan</li>
+  </ul>
+
+  <h2>Configuration</h2>
+  <p>Add the following to your Claude Desktop config file:</p>
+  <CodeBlock code={configJson} filename="claude_desktop_config.json" client:load />
+
+  <h2>Config file location</h2>
+  <ul>
+    <li><strong>macOS:</strong> <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+    <li><strong>Windows:</strong> <code>%APPDATA%\Claude\claude_desktop_config.json</code></li>
+  </ul>
+  <p>If the file doesn't exist, create it. If you already have other MCP servers configured, merge the <code>lattice</code> entry into your existing <code>mcpServers</code> object.</p>
+
+  <h2>Why mcp-remote?</h2>
+  <p>Claude Desktop currently supports stdio-based MCP servers. The <code>mcp-remote</code> package bridges the gap — it connects to the remote Lattice server over SSE/HTTP and presents it to Claude Desktop as a local stdio server. No local installation of Ferrisletter is required.</p>
+
+  <h2>Alternative: Settings &rarr; Integrations</h2>
+  <p>If Claude Desktop supports remote MCP servers natively (via Settings &rarr; Integrations), you can add the URL directly:</p>
+  <CodeBlock code="https://mcp.ferrisletter.dev/mcp" client:load />
+  <p>This method doesn't require Node.js.</p>
+
+  <h2>Verify the connection</h2>
+  <p>After restarting Claude Desktop, ask:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "What topics are available on Lattice?"
+  </blockquote>
+  <p>If you see a list of topics, the connection is working.</p>
+</DocsLayout>

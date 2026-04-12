@@ -1,0 +1,48 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import CodeBlock from '../../components/CodeBlock';
+
+const configJson = `{
+  "mcpServers": {
+    "lattice": {
+      "command": "npx",
+      "args": ["mcp-remote@latest", "https://mcp.ferrisletter.dev/mcp"]
+    }
+  }
+}`;
+---
+
+<DocsLayout title="Getting Started" description="Get up and running with Ferrisletter in under 2 minutes.">
+  <h1>Getting Started</h1>
+  <p>Get up and running with Lattice in under 2 minutes. All you need is Node.js and Claude Desktop.</p>
+
+  <h2>1. Add Lattice to Claude Desktop</h2>
+  <p>Copy this config into your Claude Desktop configuration file:</p>
+  <CodeBlock code={configJson} filename="claude_desktop_config.json" client:load />
+  <p class="mt-4">See <a href="/docs/connect-claude">Connect to Claude</a> for detailed instructions on where to find the config file.</p>
+
+  <h2>2. Restart Claude Desktop</h2>
+  <p>Quit and reopen Claude Desktop so it picks up the new MCP server configuration.</p>
+
+  <h2>3. Discover topics</h2>
+  <p>Ask Claude:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "What topics are available on Lattice?"
+  </blockquote>
+
+  <h2>4. Subscribe to topics</h2>
+  <p>Tell Claude which topics interest you:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "Subscribe me to Rust and AI topics"
+  </blockquote>
+
+  <h2>5. Set up scheduled delivery</h2>
+  <p>Configure automatic digest delivery:</p>
+  <blockquote class="border-l-2 border-[var(--color-accent)] pl-4 text-[var(--color-text-muted)] italic my-4">
+    "Set up daily delivery at 9am on weekdays"
+  </blockquote>
+  <p>See <a href="/docs/scheduled-delivery">Scheduled Delivery</a> for more options.</p>
+
+  <h2>6. Done!</h2>
+  <p>Your personalized newsletter is set up. Claude will deliver your digest on schedule, or you can ask for it anytime with "Show me my feed" or "What did I miss this week?"</p>
+</DocsLayout>

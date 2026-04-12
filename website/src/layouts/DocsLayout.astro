@@ -1,0 +1,85 @@
+---
+import Layout from './Layout.astro';
+import Nav from '../components/Nav';
+import DocsSidebar from '../components/DocsSidebar';
+import Footer from '../components/Footer.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const currentPath = Astro.url.pathname;
+---
+
+<Layout title={`${title} — Ferrisletter Docs`} description={description}>
+  <Nav client:load />
+  <div class="max-w-[1200px] mx-auto px-8 pt-28 pb-20">
+    <div class="flex gap-12">
+      <aside class="hidden md:block w-[240px] shrink-0">
+        <DocsSidebar currentPath={currentPath} client:load />
+      </aside>
+      <main class="flex-1 min-w-0 docs-content">
+        <div class="md:hidden mb-8">
+          <DocsSidebar currentPath={currentPath} client:load />
+        </div>
+        <slot />
+      </main>
+    </div>
+  </div>
+  <Footer />
+</Layout>
+
+<style is:global>
+  .docs-content h1 {
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+  }
+  .docs-content h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+  }
+  .docs-content h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .docs-content p {
+    color: var(--color-text-muted);
+    line-height: 1.7;
+    margin-bottom: 1rem;
+  }
+  .docs-content ul, .docs-content ol {
+    color: var(--color-text-muted);
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+    line-height: 1.7;
+  }
+  .docs-content ul { list-style-type: disc; }
+  .docs-content ol { list-style-type: decimal; }
+  .docs-content li { margin-bottom: 0.5rem; }
+  .docs-content code:not(pre code) {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8em;
+    background: var(--color-bg-elevated);
+    padding: 0.15em 0.4em;
+    border-radius: 0.25rem;
+  }
+  .docs-content a {
+    color: var(--color-accent);
+    transition: color 0.15s;
+  }
+  .docs-content a:hover {
+    color: var(--color-accent-hover);
+  }
+  .docs-content strong {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+</style>
