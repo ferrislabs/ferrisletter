@@ -1,0 +1,219 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav';
+import PageHeader from '../components/PageHeader.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="Features — Ferrisletter" description="Explore what makes Ferrisletter different: Generative UI digests, MCP App panels, smart delivery, and more.">
+  <Nav client:load />
+  <div class="max-w-[1200px] mx-auto px-8">
+    <PageHeader
+      tag="Features"
+      title="Everything you need in a conversational newsletter"
+      subtitle="From personalized digests to open-source extensibility — built for the way you actually consume information."
+    />
+
+    <!-- Personalized Digest -->
+    <section class="py-16 grid grid-cols-1 md:grid-cols-2 gap-12 items-center" data-reveal>
+      <div>
+        <span class="inline-block font-mono text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)] mb-3">Generative UI</span>
+        <h2 class="text-2xl font-extrabold tracking-tight mb-4">Your daily tech digest, styled your way</h2>
+        <p class="text-[var(--color-text-muted)] leading-relaxed mb-4">
+          Every morning, Claude generates a styled interactive HTML digest tailored to your subscriptions. It's not a template — it's freshly generated each time based on your preferences and the latest content.
+        </p>
+        <ul class="space-y-2 text-[var(--color-text-muted)]">
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Customize with natural language: "use colorblind-safe colors", "add emoji headers"</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>5 built-in theme presets — or describe your own</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Rendered as a rich artifact right in Claude</li>
+        </ul>
+        <a href="/themes" class="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] mt-4 transition-colors">
+          Browse themes &rarr;
+        </a>
+      </div>
+      <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-2xl p-6 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-[rgba(109,90,255,0.05)] via-transparent to-[rgba(34,211,238,0.03)] pointer-events-none"></div>
+        <div class="relative space-y-3">
+          <div class="flex items-center justify-between text-xs text-[var(--color-text-dim)]">
+            <span class="font-mono font-semibold text-[var(--color-accent)]">Lattice Digest</span>
+            <span>April 12, 2026</span>
+          </div>
+          <div class="border-t border-[var(--color-border)] pt-3">
+            <span class="inline-block text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--color-accent)] bg-[var(--color-tag-bg)] border border-[var(--color-tag-border)] px-2 py-0.5 rounded-full mb-2">Rust</span>
+            <p class="font-semibold text-sm mb-1">Async closures hit stable in Rust 1.94</p>
+            <p class="text-xs text-[var(--color-text-muted)]">Eliminating a major pain point for async code.</p>
+          </div>
+          <div class="border-t border-[var(--color-border)] pt-3">
+            <span class="inline-block text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--color-accent-secondary)] bg-[rgba(34,211,238,0.1)] border border-[rgba(34,211,238,0.25)] px-2 py-0.5 rounded-full mb-2">AI</span>
+            <p class="font-semibold text-sm mb-1">Claude 4.5 Opus released with 1M context</p>
+            <p class="text-xs text-[var(--color-text-muted)]">The most capable model yet, now generally available.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Dashboard -->
+    <section class="py-16 grid grid-cols-1 md:grid-cols-2 gap-12 items-center" data-reveal>
+      <div class="md:order-2">
+        <span class="inline-block font-mono text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)] mb-3">MCP App</span>
+        <h2 class="text-2xl font-extrabold tracking-tight mb-4">Browse, search, and explore — right inside Claude</h2>
+        <p class="text-[var(--color-text-muted)] leading-relaxed mb-4">
+          The MCP App UI renders an interactive dashboard directly alongside your conversation. Filter by topic, expand articles, track what you've read — all without leaving Claude Desktop.
+        </p>
+        <ul class="space-y-2 text-[var(--color-text-muted)]">
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Topic filtering and full-text search</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Expand items inline to read full content</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Read/unread tracking across sessions</li>
+        </ul>
+      </div>
+      <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-2xl p-6 md:order-1">
+        <div class="space-y-3">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-2 h-2 rounded-full bg-[var(--color-accent)]"></div>
+            <span class="text-xs font-mono text-[var(--color-text-dim)]">ferrisletter panel</span>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <span class="px-2.5 py-1 text-[0.65rem] font-medium rounded-full bg-[var(--color-tag-bg)] border border-[var(--color-tag-border)] text-[var(--color-accent)]">All</span>
+            <span class="px-2.5 py-1 text-[0.65rem] font-medium rounded-full bg-transparent border border-[var(--color-border)] text-[var(--color-text-dim)]">Rust</span>
+            <span class="px-2.5 py-1 text-[0.65rem] font-medium rounded-full bg-transparent border border-[var(--color-border)] text-[var(--color-text-dim)]">AI</span>
+            <span class="px-2.5 py-1 text-[0.65rem] font-medium rounded-full bg-transparent border border-[var(--color-border)] text-[var(--color-text-dim)]">MCP</span>
+          </div>
+          <div class="space-y-2">
+            <div class="p-3 rounded-lg bg-[var(--color-bg-card)] border border-[var(--color-border)]">
+              <p class="text-sm font-medium">New MCP transport spec draft</p>
+              <p class="text-xs text-[var(--color-text-dim)] mt-1">modelcontextprotocol.io &middot; 3 min</p>
+            </div>
+            <div class="p-3 rounded-lg bg-[var(--color-bg-card)] border border-[var(--color-border)]">
+              <p class="text-sm font-medium">Tokio 2.0 roadmap published</p>
+              <p class="text-xs text-[var(--color-text-dim)] mt-1">tokio.rs &middot; 5 min</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Smart Delivery -->
+    <section class="py-16 grid grid-cols-1 md:grid-cols-2 gap-12 items-center" data-reveal>
+      <div>
+        <span class="inline-block font-mono text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)] mb-3">Scheduler</span>
+        <h2 class="text-2xl font-extrabold tracking-tight mb-4">Set it and forget it</h2>
+        <p class="text-[var(--color-text-muted)] leading-relaxed mb-4">
+          Configure delivery with a single sentence. Claude calls the tools on your schedule — loading your preferences, fetching your feed, generating the digest, and marking items as read. You just open Claude and it's there.
+        </p>
+        <ul class="space-y-2 text-[var(--color-text-muted)]">
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Daily, weekday, or weekly frequency</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Pick your preferred delivery time</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Fully automated — no manual triggers needed</li>
+        </ul>
+      </div>
+      <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-2xl p-6">
+        <div class="space-y-4 font-mono text-sm">
+          <div class="flex items-start gap-3">
+            <span class="text-[var(--color-accent)] shrink-0 mt-0.5">&#9656;</span>
+            <span class="text-[var(--color-text-muted)]">"Set up daily delivery at 9am on weekdays"</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-[var(--color-accent-secondary)] shrink-0 mt-0.5">&#9671;</span>
+            <span class="text-[var(--color-text-dim)]">Scheduled: weekdays at 9:00 AM. I'll load your preferences, fetch your unread feed, generate a styled digest, and mark everything as read.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Natural Language Personalization -->
+    <section class="py-16 grid grid-cols-1 md:grid-cols-2 gap-12 items-center" data-reveal>
+      <div class="md:order-2">
+        <span class="inline-block font-mono text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)] mb-3">Personalization</span>
+        <h2 class="text-2xl font-extrabold tracking-tight mb-4">Your newsletter, your rules</h2>
+        <p class="text-[var(--color-text-muted)] leading-relaxed mb-4">
+          No settings page, no checkboxes. Just tell Claude what you want. Subscribe to topics, adjust your display, change your theme — all through natural conversation.
+        </p>
+        <ul class="space-y-2 text-[var(--color-text-muted)]">
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Pick topics and tags conversationally</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Custom display instructions (emoji headers, grouping, font size)</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Read tracking — never see the same item twice</li>
+        </ul>
+      </div>
+      <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-2xl p-6 md:order-1">
+        <div class="space-y-4 font-mono text-sm">
+          <div class="flex items-start gap-3">
+            <span class="text-[var(--color-accent)] shrink-0 mt-0.5">&#9656;</span>
+            <span class="text-[var(--color-text-muted)]">"Subscribe me to Rust and AI topics"</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-[var(--color-accent-secondary)] shrink-0 mt-0.5">&#9671;</span>
+            <span class="text-[var(--color-text-dim)]">Done! You're now subscribed to Rust and AI. You have 12 unread items.</span>
+          </div>
+          <div class="border-t border-[var(--color-border)] pt-4 flex items-start gap-3">
+            <span class="text-[var(--color-accent)] shrink-0 mt-0.5">&#9656;</span>
+            <span class="text-[var(--color-text-muted)]">"Use a colorblind-safe theme with emoji headers"</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <span class="text-[var(--color-accent-secondary)] shrink-0 mt-0.5">&#9671;</span>
+            <span class="text-[var(--color-text-dim)]">Updated! Your next digest will use the Daltonian theme with emoji section headers.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Open Platform -->
+    <section class="py-16 grid grid-cols-1 md:grid-cols-2 gap-12 items-center" data-reveal>
+      <div>
+        <span class="inline-block font-mono text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)] mb-3">Open Source</span>
+        <h2 class="text-2xl font-extrabold tracking-tight mb-4">Built on an open platform</h2>
+        <p class="text-[var(--color-text-muted)] leading-relaxed mb-4">
+          Ferrisletter is an open-source MCP newsletter SDK. The connector system is pluggable — anyone can build a connector to bring in content from any source. Published on crates.io, MIT licensed.
+        </p>
+        <ul class="space-y-2 text-[var(--color-text-muted)]">
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Pluggable connector system (RSS, static, custom)</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>Built with Rust for performance and reliability</li>
+          <li class="flex items-start gap-2"><span class="text-[var(--color-accent)] mt-1">&#9671;</span>MCP-native — works with any MCP client</li>
+        </ul>
+        <div class="flex gap-3 mt-4">
+          <a
+            href="https://github.com/ferrislabs/ferrisletter"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-2 px-5 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg text-sm font-medium hover:border-[var(--color-border-hover)] transition-all"
+          >
+            GitHub &rarr;
+          </a>
+          <a
+            href="/docs/building-connectors"
+            class="inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors py-2"
+          >
+            Build a connector &rarr;
+          </a>
+        </div>
+      </div>
+      <div class="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-2xl p-6">
+        <div class="space-y-3 font-mono text-xs text-[var(--color-text-dim)]">
+          <div class="flex items-center gap-2 text-[var(--color-text-muted)] text-sm font-semibold mb-3">
+            <span class="text-[var(--color-accent)]">&#9671;</span>
+            ferrisletter-connector
+          </div>
+          <div class="bg-[var(--color-bg)] rounded-lg p-4 overflow-x-auto">
+            <pre class="text-[var(--color-text-muted)]" set:html={`<span class="text-[var(--color-accent)]">pub trait</span> Connector: Send + Sync {
+    <span class="text-[var(--color-accent)]">async fn</span> fetch_items(&amp;self)
+        -&gt; Result&lt;Vec&lt;Item&gt;&gt;;
+    <span class="text-[var(--color-accent)]">fn</span> source_name(&amp;self) -&gt; &amp;str;
+}`} />
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+  <Footer />
+</Layout>
+
+<script>
+  document.querySelectorAll('[data-reveal]').forEach((el) => {
+    el.classList.add('opacity-0', 'translate-y-6');
+    (el as HTMLElement).style.transition = 'opacity 0.7s ease-out, transform 0.7s ease-out';
+    new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        el.classList.remove('opacity-0', 'translate-y-6');
+      }
+    }, { threshold: 0.15 }).observe(el);
+  });
+</script>
