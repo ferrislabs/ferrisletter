@@ -1,0 +1,43 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import CodeBlock from '../../components/CodeBlock';
+
+const connectorTrait = `#[async_trait]
+pub trait Connector: Send + Sync {
+    /// Fetch items from this content source.
+    async fn fetch_items(&self) -> Result<Vec<Item>>;
+
+    /// A human-readable name for this source.
+    fn source_name(&self) -> &str;
+}`;
+---
+
+<DocsLayout title="Building Connectors" description="Build your own content source with the Ferrisletter Connector SDK.">
+  <h1>Building Connectors</h1>
+  <p>Ferrisletter's connector system is pluggable — anyone can build a connector to bring in content from any source. RSS feeds, APIs, databases, scrapers — if you can fetch it, you can serve it.</p>
+
+  <h2>The Connector trait</h2>
+  <p>At its core, a connector implements a single trait:</p>
+  <CodeBlock code={connectorTrait} filename="connector.rs" client:load />
+  <p>The <code>Item</code> struct contains fields for headline, summary, source URL, publication date, topic, and tags.</p>
+
+  <h2>Built-in connectors</h2>
+  <ul>
+    <li><strong>connector-rss</strong> — Fetches items from RSS and Atom feeds</li>
+    <li><strong>connector-static</strong> — Serves items from a static JSON file (useful for testing)</li>
+  </ul>
+
+  <h2>Getting started</h2>
+  <ol>
+    <li>Add <code>ferrisletter-connector</code> as a dependency from <a href="https://crates.io/crates/ferrisletter-connector" target="_blank" rel="noopener">crates.io</a></li>
+    <li>Implement the <code>Connector</code> trait for your source</li>
+    <li>Register your connector in the server configuration</li>
+    <li>Items from your connector will appear alongside other content in the user's feed</li>
+  </ol>
+
+  <h2>Resources</h2>
+  <ul>
+    <li><a href="https://crates.io/crates/ferrisletter-connector" target="_blank" rel="noopener">ferrisletter-connector on crates.io</a></li>
+    <li><a href="https://github.com/ferrislabs/ferrisletter" target="_blank" rel="noopener">GitHub repository</a> — see <code>crates/connector-rss</code> for a reference implementation</li>
+  </ul>
+</DocsLayout>

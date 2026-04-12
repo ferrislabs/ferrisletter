@@ -1,0 +1,28 @@
+---
+import DocsLayout from '../../layouts/DocsLayout.astro';
+
+const pages = [
+  { title: 'Getting Started', href: '/docs/getting-started', description: 'Set up Lattice in Claude Desktop in under 2 minutes.' },
+  { title: 'Connect to Claude', href: '/docs/connect-claude', description: 'Detailed config instructions for Claude Desktop with mcp-remote.' },
+  { title: 'Display Preferences', href: '/docs/display-preferences', description: 'Customize your digest theme, layout, and style.' },
+  { title: 'Scheduled Delivery', href: '/docs/scheduled-delivery', description: 'Set up automatic daily or weekly digest delivery.' },
+  { title: 'Building Connectors', href: '/docs/building-connectors', description: 'Build your own content source with the Connector SDK.' },
+];
+---
+
+<DocsLayout title="Documentation" description="Learn how to set up, configure, and extend Ferrisletter.">
+  <h1>Documentation</h1>
+  <p class="text-lg mb-8">Everything you need to get started with Ferrisletter and Lattice.</p>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    {pages.map((page) => (
+      <a
+        href={page.href}
+        class="block p-5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl hover:border-[var(--color-border-hover)] transition-all group"
+      >
+        <h3 class="font-semibold text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors mb-1">{page.title}</h3>
+        <p class="text-sm text-[var(--color-text-muted)]">{page.description}</p>
+      </a>
+    ))}
+  </div>
+</DocsLayout>
