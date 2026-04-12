@@ -1,0 +1,21 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav';
+import PageHeader from '../components/PageHeader.astro';
+import ThemeGallery from '../components/ThemeGallery';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="Themes — Ferrisletter" description="Preview the 5 built-in digest themes: Default, Light, Daltonian, High Contrast, and Minimal.">
+  <Nav client:load />
+  <div class="max-w-[1200px] mx-auto px-8">
+    <PageHeader
+      tag="Themes"
+      title="See your digest in every style"
+      subtitle="Five built-in presets for your Generative UI digest. Switch anytime — or describe your own custom look."
+    />
+    <ThemeGallery client:visible />
+  </div>
+  <div class="py-16"></div>
+  <Footer />
+</Layout>
