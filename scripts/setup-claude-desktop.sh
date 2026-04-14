@@ -81,9 +81,9 @@ JSON
 
 if [ -f "$CLAUDE_CONFIG" ]; then
   if command -v jq &>/dev/null; then
-    echo "→ Merging into existing $CLAUDE_CONFIG…"
+    echo "→ Merging into existing ${CLAUDE_CONFIG}…"
     tmp=$(mktemp)
-    jq --argjson entry "$ENTRY" '.mcpServers.ferrisletter = $entry' "$CLAUDE_CONFIG" > "$tmp"
+    jq --argjson entry "$ENTRY" '.mcpServers = (.mcpServers // {}) | .mcpServers.ferrisletter = $entry' "$CLAUDE_CONFIG" > "$tmp"
     mv "$tmp" "$CLAUDE_CONFIG"
   else
     echo "⚠  jq not found — printing config to merge manually." >&2
@@ -91,7 +91,7 @@ if [ -f "$CLAUDE_CONFIG" ]; then
     exit 0
   fi
 else
-  echo "→ Creating $CLAUDE_CONFIG…"
+  echo "→ Creating ${CLAUDE_CONFIG}…"
   cat > "$CLAUDE_CONFIG" <<JSON
 {
   "mcpServers": {
