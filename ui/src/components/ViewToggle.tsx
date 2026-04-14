@@ -1,4 +1,4 @@
-import { Newspaper, Search, Clock } from "lucide-react";
+import { Newspaper, Search, Clock, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ViewMode } from "@/types";
 
@@ -11,6 +11,7 @@ const TABS: { mode: ViewMode; label: string; icon: typeof Search }[] = [
   { mode: "digest", label: "Digest", icon: Newspaper },
   { mode: "search", label: "Search", icon: Search },
   { mode: "recap", label: "Recap", icon: Clock },
+  { mode: "favorites", label: "Favorites", icon: Heart },
 ];
 
 export function ViewToggle({ activeView, onChange }: ViewToggleProps) {

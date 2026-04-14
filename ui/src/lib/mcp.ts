@@ -129,3 +129,38 @@ export async function recapItems(
   });
   return extractJson(result) as Item[];
 }
+
+// ── Favorites ──────────────────────────────────────────────────────────────
+
+export async function addFavorite(
+  app: App,
+  itemId: string,
+): Promise<{ status: string; total_favorites: number }> {
+  const result = await app.callServerTool({
+    name: "ferrisletter_add_favorite",
+    arguments: { item_id: itemId },
+  });
+  return extractJson(result) as { status: string; total_favorites: number };
+}
+
+export async function removeFavorite(
+  app: App,
+  itemId: string,
+): Promise<{ status: string; total_favorites: number }> {
+  const result = await app.callServerTool({
+    name: "ferrisletter_remove_favorite",
+    arguments: { item_id: itemId },
+  });
+  return extractJson(result) as { status: string; total_favorites: number };
+}
+
+export async function listFavorites(
+  app: App,
+  limit?: number,
+): Promise<Item[]> {
+  const result = await app.callServerTool({
+    name: "ferrisletter_list_favorites",
+    arguments: { limit },
+  });
+  return extractJson(result) as Item[];
+}

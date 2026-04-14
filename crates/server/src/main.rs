@@ -6,6 +6,7 @@ use ferrisletter_connector_rss::RssConnectorFactory;
 use ferrisletter_connector_static::StaticConnectorFactory;
 use ferrisletter_server::api::{ApiState, ConnectorHandle, FeedRecord, TopicRecord};
 use ferrisletter_server::config::{ConnectorConfig, TransportMode};
+use ferrisletter_server::favorites::{BoxedFavoriteStore, InMemoryFavoriteStore};
 use ferrisletter_server::server::FerrislletterServer;
 use ferrisletter_server::transport::{self, SseConfig};
 use ferrisletter_server::{config, server};
@@ -78,7 +79,14 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    let mcp_server = FerrislletterServer::new(connector_handle, cfg.ui.enabled);
+    // Build the favorites store with file persistence.
+    let favorites_path = InMemoryFavoriteStore::default_path();
+    tracing::info!(path = ?favorites_path, "favorites store initialised");
+    let favorites = Arc::new(BoxedFavoriteStore::new(InMemoryFavoriteStore::new(
+        favorites_path,
+    )));
+
+    let mcp_server = FerrislletterServer::new(connector_handle, cfg.ui.enabled, favorites);
 
     // Start MCP transport.
     match cfg.transport.mode {

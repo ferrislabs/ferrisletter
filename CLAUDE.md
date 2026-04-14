@@ -34,6 +34,9 @@ ferrisletter/
 3. `ferrisletter_get_item` — Fetch full content of a single item
 4. `ferrisletter_search` — Keyword search with filters
 5. `ferrisletter_recap` — Summarize items since a given date
+6. `ferrisletter_add_favorite` — Save an article to favorites
+7. `ferrisletter_remove_favorite` — Remove an article from favorites
+8. `ferrisletter_list_favorites` — List saved favorites with full item details
 
 ## MCP App UI
 
@@ -48,7 +51,18 @@ The UI follows the MCP Apps spec (`@modelcontextprotocol/ext-apps`):
 - `ui/src/App.tsx` — Root component, uses `useApp` hook, manages state
 - `ui/src/lib/mcp.ts` — SDK integration: `McpAppContext`, `inferToolResult()`, tool call helpers
 - `ui/src/views/CompactIssue.tsx` — Main digest view (topics, items, expand on click)
+- `ui/src/views/FavoritesPanel.tsx` — Favorites view (list saved articles, empty state)
 - `ui/src/lib/demo-data.ts` — Sample data for demo/standalone mode
+
+## Favorites System
+
+Server-level feature (not in the connector trait) — works with any connector.
+
+- **Storage**: `FavoriteStore` trait in `crates/server/src/favorites.rs`
+- **Default impl**: `InMemoryFavoriteStore` with JSON file persistence at `~/.config/ferrisletter/favorites.json`
+- **Type erasure**: `BoxedFavoriteStore` for external implementations (e.g. Lattice's database backend)
+- **User keying**: favorites are per-user (keyed by `user_id`, `"anonymous"` for stdio mode)
+- **Item resolution**: `list_favorites` stores only item IDs; resolves to full `Item` objects via the connector at query time
 
 ## Key Config Files
 

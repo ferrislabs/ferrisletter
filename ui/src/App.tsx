@@ -10,6 +10,7 @@ import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { CompactIssue } from "@/views/CompactIssue";
 import { SearchPanel } from "@/views/SearchPanel";
 import { RecapPanel } from "@/views/RecapPanel";
+import { FavoritesPanel } from "@/views/FavoritesPanel";
 import { ViewToggle } from "@/components/ViewToggle";
 import {
   McpAppContext,
@@ -141,6 +142,10 @@ export default function App() {
 
         {activeView === "recap" && (
           <RecapPanel topics={topics} isDemo={isDemo} />
+        )}
+
+        {activeView === "favorites" && (
+          <FavoritesPanel topics={topics} isDemo={isDemo} />
         )}
       </div>
     </McpAppContext.Provider>
