@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::favorites::BoxedFavoriteStore;
+use crate::theme::ThemeRegistry;
 use crate::users::BoxedUserStore;
 use chrono::DateTime;
 use ferrisletter_connector::{
@@ -48,6 +49,8 @@ pub struct FerrislletterServer {
     favorites: Arc<BoxedFavoriteStore>,
     /// User state store — `None` in stateless mode.
     users: Option<Arc<BoxedUserStore>>,
+    /// Theme registry (may be empty — Ferrisletter ships with no built-in themes).
+    themes: Arc<ThemeRegistry>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -73,8 +76,16 @@ impl FerrislletterServer {
             client_supports_ui: Arc::new(AtomicBool::new(false)),
             favorites,
             users,
+            themes: Arc::new(ThemeRegistry::new()),
             tool_router: Self::tool_router(),
         }
+    }
+
+    /// Replace the theme registry. Downstreams call this at startup to
+    /// register their concrete themes (e.g. Lattice registers its 5 presets).
+    pub fn with_themes(mut self, themes: Arc<ThemeRegistry>) -> Self {
+        self.themes = themes;
+        self
     }
 
     /// Borrow the user store or return a helpful error if not configured.
@@ -882,6 +893,36 @@ impl FerrislletterServer {
             return Ok(tool_ok_ui(json, count, "items"));
         }
         Ok(tool_ok_text(format!("Marked {count} item(s) as read.")))
+    }
+
+    /// List available display themes for the Generative UI digest.
+    #[tool(
+        description = "List available display themes for the Generative UI digest. \
+        Returns theme names and descriptions. Use a theme name with \
+        ferrisletter_setup_preferences (preferences: { theme: \"name\" })."
+    )]
+    #[tracing::instrument(skip(self), name = "tool:list_themes")]
+    async fn ferrisletter_list_themes(&self) -> Result<CallToolResult, ErrorData> {
+        let themes = self.themes.list();
+        let count = themes.len();
+
+        if self.should_use_ui() {
+            let json = serde_json::to_string_pretty(&themes)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+            return Ok(tool_ok_ui(json, count, "themes"));
+        }
+
+        if themes.is_empty() {
+            return Ok(tool_ok_text(
+                "No themes registered on this server.".to_string(),
+            ));
+        }
+
+        let mut text = format!("{count} theme(s) available:\n");
+        for t in &themes {
+            text.push_str(&format!("\n- **{}**: {}", t.name, t.description));
+        }
+        Ok(tool_ok_text(text))
     }
 }
 

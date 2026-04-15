@@ -36,6 +36,7 @@ pub mod health;
 pub mod server;
 #[cfg(feature = "telemetry")]
 pub mod telemetry;
+pub mod theme;
 pub mod transport;
 pub mod users;
 
@@ -43,5 +44,6 @@ pub use config::{AdminConfig, Config, ConnectorConfig, TelemetryConfig, Transpor
 pub use favorites::{BoxedFavoriteStore, FavoriteStore, InMemoryFavoriteStore};
 pub use health::ServerState;
 pub use server::{FerrislletterServer, UI_RESOURCE_URI};
+pub use theme::{DisplayPreferences, Theme, ThemeInfo, ThemeRegistry};
 pub use transport::{serve_sse, serve_stdio};
 pub use users::{BoxedUserStore, InMemoryUserStore, User, UserProfile, UserStore};
