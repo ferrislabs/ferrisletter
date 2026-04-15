@@ -5,6 +5,7 @@ members = [
     "crates/connector",
     "crates/connector-rss",
     "crates/connector-static",
+    "crates/gateway",
 ]
 
 [patch.crates-io]
