@@ -29,6 +29,7 @@ ferrisletter/
 
 ## MCP Tools
 
+### Content
 1. `ferrisletter_list_topics` — Discover available topics
 2. `ferrisletter_get_latest` — Get latest items as compact headlines
 3. `ferrisletter_get_item` — Fetch full content of a single item
@@ -37,6 +38,23 @@ ferrisletter/
 6. `ferrisletter_add_favorite` — Save an article to favorites
 7. `ferrisletter_remove_favorite` — Remove an article from favorites
 8. `ferrisletter_list_favorites` — List saved favorites with full item details
+
+### Favorites
+6. `ferrisletter_add_favorite` — Save an article to favorites
+7. `ferrisletter_remove_favorite` — Remove an article from favorites
+8. `ferrisletter_list_favorites` — List saved favorites with full item details
+
+### User state (requires a UserStore)
+9. `ferrisletter_setup_preferences` — Set topics, tags, summary length, arbitrary key-value prefs
+10. `ferrisletter_get_preferences` — Return the user's full profile
+11. `ferrisletter_get_my_feed` — Personalized, read-aware feed
+12. `ferrisletter_mark_read` — Mark item IDs as read
+
+### Themes
+13. `ferrisletter_list_themes` — List themes registered by the host (Ferrisletter itself ships zero)
+
+### Other
+14. `ferrisletter_setup_delivery` — Suggest a cron expression + prompt for scheduled delivery
 
 ## MCP App UI
 
@@ -63,6 +81,26 @@ Server-level feature (not in the connector trait) — works with any connector.
 - **Type erasure**: `BoxedFavoriteStore` for external implementations (e.g. Lattice's database backend)
 - **User keying**: favorites are per-user (keyed by `user_id`, `"anonymous"` for stdio mode)
 - **Item resolution**: `list_favorites` stores only item IDs; resolves to full `Item` objects via the connector at query time
+
+## User State System
+
+Same pattern as favorites — trait + in-memory/file default + type-erased wrapper.
+
+- **Storage**: `UserStore` trait in `crates/server/src/users.rs`
+- **Default impl**: `InMemoryUserStore` with JSON file persistence at `~/.config/ferrisletter/users.json`
+- **Type erasure**: `BoxedUserStore` for external implementations (e.g. Lattice's PostgreSQL backend)
+- **Scope**: identity (email/name), topic subscriptions, tag subscriptions, key-value preferences, read tracking
+- **Stateless mode**: the 4 user-aware tools return `invalid_request` if the server was built without a `UserStore`
+
+## Theme Registry
+
+Ferrisletter ships with **zero built-in themes** — only the pattern.
+
+- **`Theme` trait**: `name() / description() / css()` in `crates/server/src/theme.rs`
+- **`ThemeRegistry`**: registration-order-preserving map of name → `Box<dyn Theme>`
+- **`DisplayPreferences`**: generic struct with `theme`, `custom_instructions`, and an `extra` JSON blob for product-specific fields (Lattice stores `summary_words`, `separator_style`, `layout_density` there)
+- **Downstream integration**: `FerrislletterServer::with_themes(Arc<ThemeRegistry>)` replaces the default empty registry
+- **Exposure**: `ferrisletter_list_themes` returns registered themes to MCP clients
 
 ## Key Config Files
 
