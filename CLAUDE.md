@@ -35,6 +35,9 @@ ferrisletter/
 3. `ferrisletter_get_item` — Fetch full content of a single item
 4. `ferrisletter_search` — Keyword search with filters
 5. `ferrisletter_recap` — Summarize items since a given date
+6. `ferrisletter_add_favorite` — Save an article to favorites
+7. `ferrisletter_remove_favorite` — Remove an article from favorites
+8. `ferrisletter_list_favorites` — List saved favorites with full item details
 
 ### Favorites
 6. `ferrisletter_add_favorite` — Save an article to favorites
