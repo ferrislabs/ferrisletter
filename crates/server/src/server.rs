@@ -3,6 +3,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::favorites::BoxedFavoriteStore;
 use chrono::DateTime;
 use ferrisletter_connector::{
     BoxedConnector, Connector, Item, ItemDetail, Link, SearchFilters, Topic, UserPrefs,
@@ -42,15 +43,22 @@ pub struct FerrislletterServer {
     /// Whether the connected client supports the MCP-UI extension.
     /// Set during the MCP initialization handshake.
     client_supports_ui: Arc<AtomicBool>,
+    /// Favorites store (shared, type-erased).
+    favorites: Arc<BoxedFavoriteStore>,
     tool_router: ToolRouter<Self>,
 }
 
 impl FerrislletterServer {
-    pub fn new(connector: ConnectorHandle, ui_enabled: bool) -> Self {
+    pub fn new(
+        connector: ConnectorHandle,
+        ui_enabled: bool,
+        favorites: Arc<BoxedFavoriteStore>,
+    ) -> Self {
         Self {
             connector,
             ui_enabled,
             client_supports_ui: Arc::new(AtomicBool::new(false)),
+            favorites,
             tool_router: Self::tool_router(),
         }
     }
@@ -249,6 +257,24 @@ pub struct RecapParams {
     pub topics: Option<Vec<String>>,
     /// Maximum number of items to return.
     pub max_items: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AddFavoriteParams {
+    /// Item ID to save as a favorite.
+    pub item_id: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RemoveFavoriteParams {
+    /// Item ID to remove from favorites.
+    pub item_id: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ListFavoritesParams {
+    /// Maximum number of favorites to return.
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -459,6 +485,145 @@ impl FerrislletterServer {
         }
         Ok(tool_ok_text(json))
     }
+
+    /// Save an article to favorites.
+    #[tool(description = "Save an article to favorites. \
+        Pass the item_id as returned by ferrisletter_get_latest or ferrisletter_search.")]
+    #[tracing::instrument(skip(self), name = "tool:add_favorite")]
+    async fn ferrisletter_add_favorite(
+        &self,
+        Parameters(params): Parameters<AddFavoriteParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let user_id = "anonymous";
+        self.favorites
+            .add_favorite(user_id, &params.item_id)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        let count = self
+            .favorites
+            .count_favorites(user_id)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        let resp = serde_json::json!({
+            "status": "saved",
+            "item_id": params.item_id,
+            "total_favorites": count,
+        });
+        let json = serde_json::to_string_pretty(&resp)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        if self.should_use_ui() {
+            return Ok(tool_ok_ui(json, count, "favorites"));
+        }
+        Ok(tool_ok_text(format!(
+            "Saved to favorites. You now have {count} favorite(s)."
+        )))
+    }
+
+    /// Remove an article from favorites.
+    #[tool(description = "Remove an article from favorites. \
+        Pass the item_id to unfavorite.")]
+    #[tracing::instrument(skip(self), name = "tool:remove_favorite")]
+    async fn ferrisletter_remove_favorite(
+        &self,
+        Parameters(params): Parameters<RemoveFavoriteParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let user_id = "anonymous";
+        self.favorites
+            .remove_favorite(user_id, &params.item_id)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        let count = self
+            .favorites
+            .count_favorites(user_id)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        let resp = serde_json::json!({
+            "status": "removed",
+            "item_id": params.item_id,
+            "total_favorites": count,
+        });
+        let json = serde_json::to_string_pretty(&resp)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        if self.should_use_ui() {
+            return Ok(tool_ok_ui(json, count, "favorites"));
+        }
+        Ok(tool_ok_text(format!(
+            "Removed from favorites. You now have {count} favorite(s)."
+        )))
+    }
+
+    /// List saved favorites.
+    #[tool(
+        description = "List saved favorites. Returns full item details for each favorited article. \
+        Use limit to cap the number of results."
+    )]
+    #[tracing::instrument(skip(self), name = "tool:list_favorites")]
+    async fn ferrisletter_list_favorites(
+        &self,
+        Parameters(params): Parameters<ListFavoritesParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let user_id = "anonymous";
+        let entries = self
+            .favorites
+            .list_favorites(user_id, params.limit)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        // Resolve item IDs to full Items via the connector.
+        let conn = self.conn().await;
+        let mut items: Vec<Item> = Vec::new();
+        for entry in &entries {
+            match conn.get_item_detail(&entry.item_id).await {
+                Ok(detail) => items.push(detail.item),
+                Err(_) => {
+                    // Item may have been removed from the feed — include a stub.
+                    items.push(Item {
+                        id: entry.item_id.clone(),
+                        topic_id: String::new(),
+                        headline: format!("[unavailable] {}", entry.item_id),
+                        summary: String::new(),
+                        tags: Vec::new(),
+                        source: String::new(),
+                        published: entry.saved_at,
+                    });
+                }
+            }
+        }
+
+        let count = items.len();
+        if self.should_use_ui() {
+            let json = serde_json::to_string_pretty(&items)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+            return Ok(tool_ok_ui(json, count, "favorites"));
+        }
+
+        if items.is_empty() {
+            return Ok(tool_ok_text(
+                "No favorites yet. Save articles you want to revisit with ferrisletter_add_favorite."
+                    .to_string(),
+            ));
+        }
+
+        let mut text = format!("You have {} saved favorite(s):\n", count);
+        for (i, item) in items.iter().enumerate() {
+            let date = item.published.format("%Y-%m-%d");
+            text.push_str(&format!("\n{}. **{}**", i + 1, item.headline));
+            if !item.source.is_empty() {
+                text.push_str(&format!("\n   {} | {}", item.source, date));
+            }
+            if let Some(entry) = entries.get(i) {
+                let saved = entry.saved_at.format("%Y-%m-%d");
+                text.push_str(&format!("\n   Saved on: {saved}"));
+            }
+        }
+        Ok(tool_ok_text(text))
+    }
 }
 
 impl ServerHandler for FerrislletterServer {
@@ -488,7 +653,9 @@ impl ServerHandler for FerrislletterServer {
                 then `ferrisletter_get_latest` to browse headlines. \
                 Expand anything interesting with `ferrisletter_get_item`, \
                 search across past content with `ferrisletter_search`, \
-                or catch up on what you missed with `ferrisletter_recap`.",
+                or catch up on what you missed with `ferrisletter_recap`. \
+                Save articles with `ferrisletter_add_favorite` and retrieve them later \
+                with `ferrisletter_list_favorites`.",
             )
     }
 

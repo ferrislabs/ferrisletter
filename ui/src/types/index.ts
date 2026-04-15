@@ -21,7 +21,7 @@ export interface ItemDetail extends Item {
   links: { url: string; label: string }[];
 }
 
-export type ViewMode = "digest" | "search" | "recap";
+export type ViewMode = "digest" | "search" | "recap" | "favorites";
 export type SortField = "date" | "read_time";
 export type SortDirection = "asc" | "desc";
 export interface SortState {

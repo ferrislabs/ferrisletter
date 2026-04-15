@@ -10,15 +10,18 @@
 //! use std::sync::Arc;
 //! use tokio::sync::RwLock;
 //! use ferrisletter_connector::BoxedConnector;
-//! use ferrisletter_server::{FerrislletterServer, transport};
+//! use ferrisletter_server::{BoxedFavoriteStore, FerrislletterServer, InMemoryFavoriteStore, transport};
 //!
 //! # async fn run() -> anyhow::Result<()> {
 //! // Create your connector (any implementation of the Connector trait).
 //! # let my_connector: Arc<BoxedConnector> = todo!();
 //! let handle = Arc::new(RwLock::new(my_connector));
 //!
+//! // Create a favorites store.
+//! let favorites = Arc::new(BoxedFavoriteStore::new(InMemoryFavoriteStore::new(None)));
+//!
 //! // Build the MCP server.
-//! let server = FerrislletterServer::new(handle, /* ui_enabled */ true);
+//! let server = FerrislletterServer::new(handle, /* ui_enabled */ true, favorites);
 //!
 //! // Start over stdio transport.
 //! transport::serve_stdio(server).await?;
@@ -28,6 +31,7 @@
 
 pub mod api;
 pub mod config;
+pub mod favorites;
 pub mod health;
 pub mod server;
 #[cfg(feature = "telemetry")]
@@ -35,6 +39,7 @@ pub mod telemetry;
 pub mod transport;
 
 pub use config::{AdminConfig, Config, ConnectorConfig, TelemetryConfig, TransportMode, UiConfig};
+pub use favorites::{BoxedFavoriteStore, FavoriteStore, InMemoryFavoriteStore};
 pub use health::ServerState;
 pub use server::{FerrislletterServer, UI_RESOURCE_URI};
 pub use transport::{serve_sse, serve_stdio};
