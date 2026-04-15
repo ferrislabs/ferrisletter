@@ -37,9 +37,11 @@ pub mod server;
 #[cfg(feature = "telemetry")]
 pub mod telemetry;
 pub mod transport;
+pub mod users;
 
 pub use config::{AdminConfig, Config, ConnectorConfig, TelemetryConfig, TransportMode, UiConfig};
 pub use favorites::{BoxedFavoriteStore, FavoriteStore, InMemoryFavoriteStore};
 pub use health::ServerState;
 pub use server::{FerrislletterServer, UI_RESOURCE_URI};
 pub use transport::{serve_sse, serve_stdio};
+pub use users::{BoxedUserStore, InMemoryUserStore, User, UserProfile, UserStore};
