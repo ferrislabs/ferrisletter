@@ -9,6 +9,7 @@ use ferrisletter_server::config::{ConnectorConfig, TransportMode};
 use ferrisletter_server::favorites::{BoxedFavoriteStore, InMemoryFavoriteStore};
 use ferrisletter_server::server::FerrislletterServer;
 use ferrisletter_server::transport::{self, SseConfig};
+use ferrisletter_server::users::{BoxedUserStore, InMemoryUserStore};
 use ferrisletter_server::{config, server};
 use tokio::sync::RwLock;
 
@@ -86,7 +87,17 @@ async fn main() -> anyhow::Result<()> {
         favorites_path,
     )));
 
-    let mcp_server = FerrislletterServer::new(connector_handle, cfg.ui.enabled, favorites);
+    // Build the user store with file persistence.
+    let users_path = InMemoryUserStore::default_path();
+    tracing::info!(path = ?users_path, "user store initialised");
+    let users = Arc::new(BoxedUserStore::new(InMemoryUserStore::new(users_path)));
+
+    let mcp_server = FerrislletterServer::with_user_store(
+        connector_handle,
+        cfg.ui.enabled,
+        favorites,
+        Some(users),
+    );
 
     // Start MCP transport.
     match cfg.transport.mode {

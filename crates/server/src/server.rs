@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::favorites::BoxedFavoriteStore;
+use crate::users::BoxedUserStore;
 use chrono::DateTime;
 use ferrisletter_connector::{
     BoxedConnector, Connector, Item, ItemDetail, Link, SearchFilters, Topic, UserPrefs,
@@ -45,6 +46,8 @@ pub struct FerrislletterServer {
     client_supports_ui: Arc<AtomicBool>,
     /// Favorites store (shared, type-erased).
     favorites: Arc<BoxedFavoriteStore>,
+    /// User state store — `None` in stateless mode.
+    users: Option<Arc<BoxedUserStore>>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -54,13 +57,34 @@ impl FerrislletterServer {
         ui_enabled: bool,
         favorites: Arc<BoxedFavoriteStore>,
     ) -> Self {
+        Self::with_user_store(connector, ui_enabled, favorites, None)
+    }
+
+    /// Build a server with a user store (enables personalized tools).
+    pub fn with_user_store(
+        connector: ConnectorHandle,
+        ui_enabled: bool,
+        favorites: Arc<BoxedFavoriteStore>,
+        users: Option<Arc<BoxedUserStore>>,
+    ) -> Self {
         Self {
             connector,
             ui_enabled,
             client_supports_ui: Arc::new(AtomicBool::new(false)),
             favorites,
+            users,
             tool_router: Self::tool_router(),
         }
+    }
+
+    /// Borrow the user store or return a helpful error if not configured.
+    fn require_user_store(&self) -> Result<&Arc<BoxedUserStore>, ErrorData> {
+        self.users.as_ref().ok_or_else(|| {
+            ErrorData::invalid_request(
+                "user store not configured on this server (stateless mode)".to_string(),
+                None,
+            )
+        })
     }
 
     /// Borrow the active connector for one request.
@@ -257,6 +281,32 @@ pub struct RecapParams {
     pub topics: Option<Vec<String>>,
     /// Maximum number of items to return.
     pub max_items: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SetupPreferencesParams {
+    /// Topic IDs to subscribe to (e.g. ["rust", "ai"]).
+    pub topics: Option<Vec<String>>,
+    /// Tags to subscribe to (e.g. ["mcp", "async"]).
+    pub tags: Option<Vec<String>>,
+    /// Summary length preference: "brief", "standard", or "detailed".
+    pub summary_length: Option<String>,
+    /// Arbitrary key-value preferences for extensibility.
+    pub preferences: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GetMyFeedParams {
+    /// Maximum number of items to return.
+    pub max_items: Option<usize>,
+    /// Only return unread items.
+    pub unread_only: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct MarkReadParams {
+    /// Item IDs to mark as read.
+    pub item_ids: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -624,6 +674,215 @@ impl FerrislletterServer {
         }
         Ok(tool_ok_text(text))
     }
+
+    /// Set or update user preferences (topics, tags, display settings).
+    #[tool(description = "Set or update your content preferences. \
+        Provide topics and tags you're interested in. \
+        Only provided fields are updated — omitted fields keep their current values.")]
+    #[tracing::instrument(skip(self), name = "tool:setup_preferences")]
+    async fn ferrisletter_setup_preferences(
+        &self,
+        Parameters(params): Parameters<SetupPreferencesParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let users = self.require_user_store()?;
+        let user_id = "anonymous";
+
+        // Ensure the user row exists so changes persist.
+        users
+            .upsert_user(user_id, None, None)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        if let Some(topics) = params.topics.as_ref() {
+            users
+                .set_topics(user_id, topics)
+                .await
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        }
+        if let Some(tags) = params.tags.as_ref() {
+            users
+                .set_tags(user_id, tags)
+                .await
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        }
+        if let Some(summary) = params.summary_length.as_ref() {
+            users
+                .set_preference(user_id, "summary_length", summary)
+                .await
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        }
+        if let Some(extras) = params.preferences.as_ref() {
+            for (k, v) in extras {
+                users
+                    .set_preference(user_id, k, v)
+                    .await
+                    .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+            }
+        }
+
+        // Return the updated profile.
+        let profile = users
+            .get_profile(user_id)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        let json = serde_json::to_string_pretty(&profile)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        if self.should_use_ui() {
+            return Ok(tool_ok_ui(json, 1, "profile"));
+        }
+        Ok(tool_ok_text(format!(
+            "Preferences updated. Current profile:\n{json}"
+        )))
+    }
+
+    /// Get the user's current profile and preferences.
+    #[tool(
+        description = "Get your current profile and content preferences, including \
+        subscribed topics, tags, and key-value preferences."
+    )]
+    #[tracing::instrument(skip(self), name = "tool:get_preferences")]
+    async fn ferrisletter_get_preferences(&self) -> Result<CallToolResult, ErrorData> {
+        let users = self.require_user_store()?;
+        let user_id = "anonymous";
+
+        let profile = users
+            .get_profile(user_id)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        if profile.is_none() {
+            return Ok(tool_ok_text(
+                "No profile yet. Call ferrisletter_setup_preferences to get started.".to_string(),
+            ));
+        }
+
+        let json = serde_json::to_string_pretty(&profile)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        if self.should_use_ui() {
+            return Ok(tool_ok_ui(json, 1, "profile"));
+        }
+        Ok(tool_ok_text(json))
+    }
+
+    /// Get a personalized feed filtered by the user's topic/tag subscriptions.
+    #[tool(
+        description = "Get your personalized feed filtered by your subscribed topics and tags. \
+        Items are annotated with read state. Use unread_only=true to skip already-read items."
+    )]
+    #[tracing::instrument(skip(self), name = "tool:get_my_feed")]
+    async fn ferrisletter_get_my_feed(
+        &self,
+        Parameters(params): Parameters<GetMyFeedParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let users = self.require_user_store()?;
+        let user_id = "anonymous";
+
+        let topics = users
+            .get_topics(user_id)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let tags = users
+            .get_tags(user_id)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        let prefs = UserPrefs {
+            topics_of_interest: topics.clone(),
+            max_items: params.max_items,
+            ..Default::default()
+        };
+
+        let mut items = self
+            .conn()
+            .await
+            .get_latest_items(&prefs)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        // Tag filter (server-side if we have subscribed tags).
+        if !tags.is_empty() {
+            items.retain(|it| it.tags.iter().any(|t| tags.contains(t)));
+        }
+
+        // Split read / unread.
+        let candidate_ids: Vec<String> = items.iter().map(|i| i.id.clone()).collect();
+        let mut read_set = std::collections::HashSet::new();
+        for id in &candidate_ids {
+            if users
+                .is_read(user_id, id)
+                .await
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?
+            {
+                read_set.insert(id.clone());
+            }
+        }
+
+        if params.unread_only.unwrap_or(false) {
+            items.retain(|i| !read_set.contains(&i.id));
+        }
+
+        let count = items.len();
+        let unread = items.iter().filter(|i| !read_set.contains(&i.id)).count();
+
+        if self.should_use_ui() {
+            let json = serde_json::to_string_pretty(&items)
+                .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+            return Ok(tool_ok_ui(json, count, "items"));
+        }
+
+        if items.is_empty() {
+            return Ok(tool_ok_text(
+                "No items in your personalized feed. Try subscribing to more topics with \
+                 ferrisletter_setup_preferences."
+                    .to_string(),
+            ));
+        }
+
+        let mut text = format!("Your personalized feed — {count} item(s), {unread} unread:\n");
+        for (i, item) in items.iter().enumerate() {
+            let date = item.published.format("%Y-%m-%d");
+            let marker = if read_set.contains(&item.id) {
+                " [read]"
+            } else {
+                ""
+            };
+            text.push_str(&format!("\n{}. **{}**{}", i + 1, item.headline, marker));
+            text.push_str(&format!("\n   {} | {}", item.source, date));
+        }
+        Ok(tool_ok_text(text))
+    }
+
+    /// Mark items as read.
+    #[tool(description = "Mark one or more items as read. Pass the item_ids to mark.")]
+    #[tracing::instrument(skip(self), name = "tool:mark_read")]
+    async fn ferrisletter_mark_read(
+        &self,
+        Parameters(params): Parameters<MarkReadParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let users = self.require_user_store()?;
+        let user_id = "anonymous";
+
+        users
+            .mark_read(user_id, &params.item_ids)
+            .await
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        let count = params.item_ids.len();
+        let resp = serde_json::json!({
+            "status": "ok",
+            "marked_read": count,
+        });
+        let json = serde_json::to_string_pretty(&resp)
+            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+
+        if self.should_use_ui() {
+            return Ok(tool_ok_ui(json, count, "items"));
+        }
+        Ok(tool_ok_text(format!("Marked {count} item(s) as read.")))
+    }
 }
 
 impl ServerHandler for FerrislletterServer {
@@ -655,7 +914,11 @@ impl ServerHandler for FerrislletterServer {
                 search across past content with `ferrisletter_search`, \
                 or catch up on what you missed with `ferrisletter_recap`. \
                 Save articles with `ferrisletter_add_favorite` and retrieve them later \
-                with `ferrisletter_list_favorites`.",
+                with `ferrisletter_list_favorites`. \
+                Personalize the experience with `ferrisletter_setup_preferences` \
+                (topics, tags, display settings) and retrieve a personalized, \
+                read-tracked feed via `ferrisletter_get_my_feed`. \
+                Track what you've seen with `ferrisletter_mark_read`.",
             )
     }
 
