@@ -156,7 +156,7 @@ pub async fn serve_sse(
 ///
 /// Returns the resource identifier, authorization servers, and supported
 /// scopes — all sourced from the [`AuthProvider`](crate::auth::AuthProvider).
-fn add_protected_resource_endpoint(
+pub fn add_protected_resource_endpoint(
     router: axum::Router,
     auth: Arc<BoxedAuthProvider>,
     public_url: String,
@@ -185,7 +185,7 @@ fn add_protected_resource_endpoint(
 ///
 /// - Well-known endpoints (`.well-known/*`) always pass through.
 /// - Missing or invalid token → 401 with `WWW-Authenticate` header.
-async fn auth_middleware(
+pub async fn auth_middleware(
     State(auth): State<Arc<BoxedAuthProvider>>,
     headers: HeaderMap,
     mut request: Request,
@@ -250,7 +250,7 @@ fn unauthorized_response(auth: &BoxedAuthProvider) -> Response {
 ///
 /// Every authorization attempt succeeds immediately — this is intentionally
 /// insecure and only suitable for local/dev use.
-fn add_oauth_stub(router: axum::Router, base: String) -> axum::Router {
+pub fn add_oauth_stub(router: axum::Router, base: String) -> axum::Router {
     let b = base.clone();
     let protected_resource = move || {
         let b = b.clone();
