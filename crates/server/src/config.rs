@@ -60,6 +60,7 @@ pub struct AuthConfig {
 }
 
 impl Default for AuthConfig {
+    #[allow(clippy::derivable_impls)]
     fn default() -> Self {
         Self {
             enabled: false,

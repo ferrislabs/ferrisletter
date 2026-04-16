@@ -156,9 +156,8 @@ impl OidcAuthProvider {
         jwks: &jsonwebtoken::jwk::JwkSet,
         kid: &str,
     ) -> Option<jsonwebtoken::DecodingKey> {
-        jwks.find(kid).and_then(|jwk| {
-            jsonwebtoken::DecodingKey::from_jwk(jwk).ok()
-        })
+        jwks.find(kid)
+            .and_then(|jwk| jsonwebtoken::DecodingKey::from_jwk(jwk).ok())
     }
 
     /// Refresh the JWKS from the issuer (e.g. when a `kid` is not found).
@@ -251,9 +250,7 @@ impl AuthProvider for OidcAuthProvider {
         match jsonwebtoken::decode::<Claims>(token, &decoding_key, &validation) {
             Ok(token_data) => {
                 let claims = token_data.claims;
-                let display_name = claims
-                    .name
-                    .or(claims.preferred_username);
+                let display_name = claims.name.or(claims.preferred_username);
                 Ok(Some(AuthUser {
                     user_id: claims.sub.clone(),
                     external_id: Some(claims.sub),
@@ -273,7 +270,11 @@ impl AuthProvider for OidcAuthProvider {
     }
 
     fn scopes_supported(&self) -> Vec<String> {
-        vec!["openid".to_string(), "profile".to_string(), "email".to_string()]
+        vec![
+            "openid".to_string(),
+            "profile".to_string(),
+            "email".to_string(),
+        ]
     }
 }
 
