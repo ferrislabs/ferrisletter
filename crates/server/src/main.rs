@@ -92,12 +92,33 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(path = ?users_path, "user store initialised");
     let users = Arc::new(BoxedUserStore::new(InMemoryUserStore::new(users_path)));
 
+    // Build the auth provider from config.
+    let auth: std::sync::Arc<ferrisletter_server::BoxedAuthProvider> = if cfg.auth.enabled {
+        if let Some(ref oidc) = cfg.auth.oidc {
+            tracing::info!(issuer = %oidc.issuer_url, "OIDC auth enabled, starting discovery");
+            let provider =
+                ferrisletter_server::OidcAuthProvider::discover(&oidc.issuer_url, &oidc.audience)
+                    .await?;
+            std::sync::Arc::new(ferrisletter_server::BoxedAuthProvider::new(provider))
+        } else {
+            tracing::warn!("auth enabled but no [auth.oidc] configured, falling back to NoAuth");
+            std::sync::Arc::new(ferrisletter_server::BoxedAuthProvider::new(
+                ferrisletter_server::NoAuthProvider,
+            ))
+        }
+    } else {
+        std::sync::Arc::new(ferrisletter_server::BoxedAuthProvider::new(
+            ferrisletter_server::NoAuthProvider,
+        ))
+    };
+
     let mcp_server = FerrislletterServer::with_user_store(
         connector_handle,
         cfg.ui.enabled,
         favorites,
         Some(users),
-    );
+    )
+    .with_auth(auth);
 
     // Start MCP transport.
     match cfg.transport.mode {
@@ -110,6 +131,7 @@ async fn main() -> anyhow::Result<()> {
                     .transport
                     .shutdown_timeout_seconds
                     .map(std::time::Duration::from_secs),
+                auth_enabled: cfg.auth.enabled,
             };
             transport::serve_sse(mcp_server, addr, &sse_config, server_state).await?;
         }

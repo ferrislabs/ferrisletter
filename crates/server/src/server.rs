@@ -3,6 +3,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::auth::BoxedAuthProvider;
 use crate::favorites::BoxedFavoriteStore;
 use crate::theme::ThemeRegistry;
 use crate::users::BoxedUserStore;
@@ -51,6 +52,8 @@ pub struct FerrislletterServer {
     users: Option<Arc<BoxedUserStore>>,
     /// Theme registry (may be empty — Ferrisletter ships with no built-in themes).
     themes: Arc<ThemeRegistry>,
+    /// Auth provider (defaults to `NoAuthProvider`).
+    auth: Arc<BoxedAuthProvider>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -77,6 +80,7 @@ impl FerrislletterServer {
             favorites,
             users,
             themes: Arc::new(ThemeRegistry::new()),
+            auth: Arc::new(BoxedAuthProvider::new(crate::auth::NoAuthProvider)),
             tool_router: Self::tool_router(),
         }
     }
@@ -86,6 +90,17 @@ impl FerrislletterServer {
     pub fn with_themes(mut self, themes: Arc<ThemeRegistry>) -> Self {
         self.themes = themes;
         self
+    }
+
+    /// Set the auth provider. Defaults to [`NoAuthProvider`](crate::auth::NoAuthProvider).
+    pub fn with_auth(mut self, auth: Arc<BoxedAuthProvider>) -> Self {
+        self.auth = auth;
+        self
+    }
+
+    /// Borrow the auth provider.
+    pub fn auth(&self) -> &Arc<BoxedAuthProvider> {
+        &self.auth
     }
 
     /// Borrow the user store or return a helpful error if not configured.

@@ -28,7 +28,55 @@ pub struct Config {
     pub ui: UiConfig,
 
     #[serde(default)]
+    pub auth: AuthConfig,
+
+    #[serde(default)]
     pub telemetry: TelemetryConfig,
+}
+
+// --- Auth ---
+
+/// Authentication configuration.
+///
+/// When `enabled = true` and an `[auth.oidc]` section is present, the server
+/// validates bearer tokens via OIDC/JWKS. Otherwise `NoAuthProvider` is used.
+///
+/// ```toml
+/// [auth]
+/// enabled = true
+///
+/// [auth.oidc]
+/// issuer_url = "https://ciam.cloud-iam.com/realms/lattice"
+/// audience   = "https://mcp.lattice.dev"
+/// ```
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuthConfig {
+    /// Master switch — when `false` (default), all requests are anonymous.
+    #[serde(default)]
+    pub enabled: bool,
+    /// OIDC provider configuration.
+    #[serde(default)]
+    pub oidc: Option<OidcConfig>,
+}
+
+impl Default for AuthConfig {
+    #[allow(clippy::derivable_impls)]
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            oidc: None,
+        }
+    }
+}
+
+/// OIDC provider settings.
+#[derive(Debug, Deserialize, Clone)]
+pub struct OidcConfig {
+    /// OIDC issuer URL (e.g. `https://ciam.cloud-iam.com/realms/lattice`).
+    /// The server appends `/.well-known/openid-configuration` to discover endpoints.
+    pub issuer_url: String,
+    /// Expected `aud` claim in JWT tokens.
+    pub audience: String,
 }
 
 // --- Admin REST API ---
@@ -328,5 +376,29 @@ mod tests {
         assert!(!config.telemetry.enabled);
         assert_eq!(config.telemetry.endpoint, "http://localhost:4317");
         assert_eq!(config.telemetry.service_name, "ferrisletter");
+    }
+
+    #[test]
+    fn parses_auth_config() {
+        let toml = r#"
+            [auth]
+            enabled = true
+
+            [auth.oidc]
+            issuer_url = "https://ciam.cloud-iam.com/realms/lattice"
+            audience = "https://mcp.lattice.dev"
+        "#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(config.auth.enabled);
+        let oidc = config.auth.oidc.unwrap();
+        assert_eq!(oidc.issuer_url, "https://ciam.cloud-iam.com/realms/lattice");
+        assert_eq!(oidc.audience, "https://mcp.lattice.dev");
+    }
+
+    #[test]
+    fn auth_defaults_to_disabled() {
+        let config: Config = toml::from_str("").unwrap();
+        assert!(!config.auth.enabled);
+        assert!(config.auth.oidc.is_none());
     }
 }

@@ -2,12 +2,15 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::{
     Json,
-    extract::Query,
-    response::Redirect,
+    extract::{Query, Request, State},
+    http::{HeaderMap, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Redirect, Response},
     routing::{get, post},
 };
 use rmcp::ServiceExt;
@@ -18,6 +21,7 @@ use rmcp::transport::streamable_http_server::{
 use tokio_util::sync::CancellationToken;
 use tower_http::cors::{Any, CorsLayer};
 
+use crate::auth::{AuthUser, BoxedAuthProvider};
 use crate::health::{self, ServerState};
 use crate::server::FerrislletterServer;
 
@@ -26,15 +30,20 @@ const DEFAULT_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Configuration for the SSE/HTTP transport.
 pub struct SseConfig {
-    /// Optional public base URL for OAuth stub endpoints (e.g. `https://abc.ngrok-free.app`).
+    /// Optional public base URL for OAuth metadata (e.g. `https://abc.ngrok-free.app`).
     pub public_url: Option<String>,
     /// Graceful shutdown timeout. Defaults to 30 seconds.
     pub shutdown_timeout: Option<Duration>,
+    /// Whether real auth is enabled (`[auth] enabled = true` in config).
+    /// When true, the auth middleware validates tokens and the old OAuth
+    /// stub endpoints (`/authorize`, `/token`, `/register`) are **not** mounted.
+    pub auth_enabled: bool,
 }
 
 /// Start the MCP server over stdio transport.
 ///
 /// Handles SIGINT (Ctrl+C) for clean shutdown.
+/// Auth is always anonymous over stdio per the MCP spec.
 pub async fn serve_stdio(server: FerrislletterServer) -> anyhow::Result<()> {
     tracing::info!("serving MCP over stdio");
     let service = server
@@ -56,9 +65,11 @@ pub async fn serve_stdio(server: FerrislletterServer) -> anyhow::Result<()> {
 
 /// Start the MCP server over SSE/HTTP transport.
 ///
-/// Listens for SIGTERM and SIGINT to initiate graceful shutdown, draining
-/// in-flight connections before exiting. The `server_state` is used for
-/// health and readiness probes (`/healthz`, `/readyz`).
+/// When auth is enabled the server:
+/// - serves `/.well-known/oauth-protected-resource` from the auth provider
+/// - applies auth middleware (bearer token → AuthUser)
+///
+/// When auth is disabled, the old OAuth stubs are mounted instead.
 pub async fn serve_sse(
     server: FerrislletterServer,
     addr: SocketAddr,
@@ -109,9 +120,20 @@ pub async fn serve_sse(
         .nest_service("/mcp", service.clone())
         .fallback_service(service);
 
-    // Stub OAuth 2.0 endpoints so claude.ai can connect without real auth.
-    if let Some(public_url) = config.public_url.clone() {
-        tracing::info!(%public_url, "OAuth stub enabled");
+    let auth = server.auth().clone();
+
+    if config.auth_enabled {
+        // Real auth — protected resource metadata + auth middleware.
+        tracing::info!("auth middleware enabled");
+        let public_url = config.public_url.clone().unwrap_or_default();
+        router = add_protected_resource_endpoint(router, auth.clone(), public_url);
+        router = router.layer(axum::middleware::from_fn_with_state(
+            auth.clone(),
+            auth_middleware,
+        ));
+    } else if let Some(public_url) = config.public_url.clone() {
+        // No auth — mount OAuth stubs for claude.ai compatibility.
+        tracing::info!(%public_url, "OAuth stub enabled (auth disabled)");
         router = add_oauth_stub(router, public_url);
     }
 
@@ -127,6 +149,101 @@ pub async fn serve_sse(
     tracing::info!("shutdown complete");
     Ok(())
 }
+
+// ── Protected Resource Metadata (RFC 9728) ───────────────────────────────
+
+/// Add the `/.well-known/oauth-protected-resource` endpoint.
+///
+/// Returns the resource identifier, authorization servers, and supported
+/// scopes — all sourced from the [`AuthProvider`](crate::auth::AuthProvider).
+fn add_protected_resource_endpoint(
+    router: axum::Router,
+    auth: Arc<BoxedAuthProvider>,
+    public_url: String,
+) -> axum::Router {
+    let handler = move |State(auth): State<Arc<BoxedAuthProvider>>| {
+        let public_url = public_url.clone();
+        async move {
+            Json(serde_json::json!({
+                "resource": public_url,
+                "authorization_servers": auth.authorization_servers(),
+                "scopes_supported": auth.scopes_supported(),
+            }))
+        }
+    };
+
+    router.route(
+        "/.well-known/oauth-protected-resource",
+        get(handler).with_state(auth),
+    )
+}
+
+// ── Auth Middleware ───────────────────────────────────────────────────────
+
+/// Axum middleware that extracts `Authorization: Bearer <token>`, calls the
+/// auth provider, and injects [`AuthUser`] into request extensions.
+///
+/// - Well-known endpoints (`.well-known/*`) always pass through.
+/// - Missing or invalid token → 401 with `WWW-Authenticate` header.
+async fn auth_middleware(
+    State(auth): State<Arc<BoxedAuthProvider>>,
+    headers: HeaderMap,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let path = request.uri().path();
+
+    // Always allow well-known discovery endpoints and health probes.
+    if path.starts_with("/.well-known/") || path == "/healthz" || path == "/readyz" {
+        request.extensions_mut().insert(AuthUser::anonymous());
+        return next.run(request).await;
+    }
+
+    // Extract bearer token.
+    let token = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "));
+
+    let token = match token {
+        Some(t) => t,
+        None => {
+            return unauthorized_response(&auth);
+        }
+    };
+
+    // Validate the token.
+    match auth.authenticate(token).await {
+        Ok(Some(user)) => {
+            request.extensions_mut().insert(user);
+            next.run(request).await
+        }
+        Ok(None) => unauthorized_response(&auth),
+        Err(e) => {
+            tracing::warn!("auth provider error: {e}");
+            unauthorized_response(&auth)
+        }
+    }
+}
+
+/// Build a 401 response with `WWW-Authenticate` header pointing to the IAM.
+fn unauthorized_response(auth: &BoxedAuthProvider) -> Response {
+    let servers = auth.authorization_servers();
+    let www_auth = if let Some(server) = servers.first() {
+        format!("Bearer realm=\"{server}\"")
+    } else {
+        "Bearer".to_string()
+    };
+
+    (
+        StatusCode::UNAUTHORIZED,
+        [("WWW-Authenticate", www_auth)],
+        Json(serde_json::json!({ "error": "unauthorized" })),
+    )
+        .into_response()
+}
+
+// ── OAuth stubs (dev mode) ───────────────────────────────────────────────
 
 /// Add stub OAuth 2.0 endpoints so hosting clients (e.g. claude.ai) that
 /// require OAuth discovery can connect without a real auth server.
