@@ -30,6 +30,7 @@
 //! ```
 
 pub mod api;
+pub mod auth;
 pub mod config;
 pub mod favorites;
 pub mod health;
@@ -40,7 +41,11 @@ pub mod theme;
 pub mod transport;
 pub mod users;
 
-pub use config::{AdminConfig, Config, ConnectorConfig, TelemetryConfig, TransportMode, UiConfig};
+pub use auth::{AuthProvider, AuthUser, BoxedAuthProvider, NoAuthProvider, OidcAuthProvider};
+pub use config::{
+    AdminConfig, AuthConfig, Config, ConnectorConfig, OidcConfig, TelemetryConfig, TransportMode,
+    UiConfig,
+};
 pub use favorites::{BoxedFavoriteStore, FavoriteStore, InMemoryFavoriteStore};
 pub use health::ServerState;
 pub use server::{FerrislletterServer, UI_RESOURCE_URI};
