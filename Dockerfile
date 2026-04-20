@@ -11,7 +11,7 @@ COPY crates/connector-rss/Cargo.toml    crates/connector-rss/Cargo.toml
 COPY crates/server/Cargo.toml           crates/server/Cargo.toml
 COPY crates/gateway/Cargo.toml          crates/gateway/Cargo.toml
 COPY vendor/rmcp/Cargo.toml             vendor/rmcp/Cargo.toml
-
+COPY vendor/rmcp/build.rs               vendor/rmcp/build.rs
 RUN mkdir -p crates/connector/src crates/connector-static/src \
              crates/connector-rss/src crates/server/src crates/gateway/src vendor/rmcp/src && \
     echo 'fn main() {}' > crates/server/src/main.rs && \
@@ -19,11 +19,13 @@ RUN mkdir -p crates/connector/src crates/connector-static/src \
     touch crates/connector/src/lib.rs \
           crates/connector-static/src/lib.rs \
           crates/connector-rss/src/lib.rs \
-          vendor/rmcp/src/lib.rs && \
+          vendor/rmcp/src/lib.rs \
+          crates/server/src/lib.rs && \
     cargo build --release
 
 
 COPY crates/ crates/
+COPY vendor/ vendor/
 RUN touch crates/*/src/*.rs && \
     touch vendor/rmcp/src/lib.rs && \
     cargo build --release
