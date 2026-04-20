@@ -1,47 +1,69 @@
-# syntax=docker/dockerfile:1
 
-# ── Stage 1: build ────────────────────────────────────────────────────────────
-FROM rust:slim-bookworm AS builder
+FROM rust:1.91-bookworm AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /usr/local/src/ferrisletter
 
-WORKDIR /app
 
-# Cache dependency compilation separately from source.
-# Copy manifests first, build a fake main to warm the cache, then copy source.
 COPY Cargo.toml Cargo.lock ./
-COPY crates/connector/Cargo.toml       crates/connector/Cargo.toml
+COPY crates/connector/Cargo.toml        crates/connector/Cargo.toml
 COPY crates/connector-static/Cargo.toml crates/connector-static/Cargo.toml
-COPY crates/connector-rss/Cargo.toml   crates/connector-rss/Cargo.toml
-COPY crates/server/Cargo.toml          crates/server/Cargo.toml
+COPY crates/connector-rss/Cargo.toml    crates/connector-rss/Cargo.toml
+COPY crates/server/Cargo.toml           crates/server/Cargo.toml
+COPY crates/gateway/Cargo.toml          crates/gateway/Cargo.toml
+COPY vendor/rmcp/Cargo.toml             vendor/rmcp/Cargo.toml
 
-# Stub out each crate so cargo can resolve and build deps.
 RUN mkdir -p crates/connector/src crates/connector-static/src \
-             crates/connector-rss/src crates/server/src && \
-    echo 'pub fn main() {}' > crates/server/src/main.rs && \
+             crates/connector-rss/src crates/server/src crates/gateway/src vendor/rmcp/src && \
+    echo 'fn main() {}' > crates/server/src/main.rs && \
+    echo 'fn main() {}' > crates/gateway/src/main.rs && \
     touch crates/connector/src/lib.rs \
           crates/connector-static/src/lib.rs \
-          crates/connector-rss/src/lib.rs && \
-    cargo build --release -p ferrisletter-server 2>/dev/null || true
+          crates/connector-rss/src/lib.rs \
+          vendor/rmcp/src/lib.rs && \
+    cargo build --release
 
-# Now copy the real source and rebuild (only changed crates recompile).
+
 COPY crates/ crates/
 RUN touch crates/*/src/*.rs && \
-    cargo build --release -p ferrisletter-server
+    touch vendor/rmcp/src/lib.rs && \
+    cargo build --release
 
-# ── Stage 2: runtime ──────────────────────────────────────────────────────────
-# distroless/cc includes glibc + libssl — no shell, non-root by default.
-FROM gcr.io/distroless/cc-debian12:nonroot
 
-COPY --from=builder /app/target/release/ferrisletter-server /ferrisletter-server
+FROM debian:bookworm-slim AS runtime
 
-# Config can be provided via:
-#   - FERRISLETTER_CONFIG=/config/ferrisletter.toml (bind-mount the file)
-#   - FERRISLETTER_DATA=/data/newsletter.json       (static JSON only)
-#   - Neither — falls back to embedded sample data
+RUN \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates=20230311+deb12u1 \
+    libssl3=3.0.17-1~deb12u2 && \
+    rm -rf /var/lib/apt/lists/* && \
+    addgroup \
+    --system \
+    --gid 1000 \
+    ferrisletter && \
+    adduser \
+    --system \
+    --no-create-home \
+    --disabled-login \
+    --uid 1000 \
+    --gid 1000 \
+    ferrisletter
 
-EXPOSE 3000
+USER ferrisletter
 
-ENTRYPOINT ["/ferrisletter-server"]
+
+FROM runtime AS gateway
+
+COPY --from=builder /usr/local/src/ferrisletter/target/release/gateway /usr/local/bin/gateway
+
+EXPOSE 8080
+
+ENTRYPOINT [ "gateway" ]
+
+FROM runtime AS server
+
+COPY --from=builder /usr/local/src/ferrisletter/target/release/ferrisletter-server /usr/local/bin/ferrisletter-server
+
+EXPOSE 8080
+
+ENTRYPOINT [ "ferrisletter-server" ]

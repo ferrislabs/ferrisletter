@@ -56,6 +56,14 @@ pub struct GatewayConfig {
 
     #[arg(
         long,
+        env = "OIDC_CLIENT_ID",
+        default_value = "security-admin-console",
+        hide_env_values = true
+    )]
+    pub oidc_client_id: String,
+
+    #[arg(
+        long,
         env = "OIDC_SCOPES_SUPPORTED",
         value_delimiter = ',',
         default_value = "openid,profile,email",
@@ -97,6 +105,7 @@ pub struct AppState {
     oidc_metadata: AuthorizationServerMetadata,
     oidc_authorization_endpoint: String,
     oidc_token_endpoint: String,
+    oidc_client_id: String,
 }
 
 impl AppState {
@@ -127,10 +136,11 @@ impl AppState {
             upstream_client,
             required_scopes: config.oidc_scopes_supported.clone(),
             oidc_metadata: AuthorizationServerMetadata {
-                issuer: oidc_expected_issuer,
+                issuer: oidc_expected_issuer.clone(),
                 authorization_endpoint: oidc_authorization_endpoint.clone(),
                 token_endpoint: oidc_token_endpoint.clone(),
                 jwks_uri: oidc_jwks_url,
+                registration_endpoint: None,
                 response_types_supported: vec!["code".to_string()],
                 grant_types_supported: vec!["authorization_code".to_string()],
                 code_challenge_methods_supported: vec!["S256".to_string()],
@@ -143,6 +153,7 @@ impl AppState {
             },
             oidc_authorization_endpoint,
             oidc_token_endpoint,
+            oidc_client_id: config.oidc_client_id,
         })
     }
 }
@@ -176,6 +187,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/authorize", any(compat_authorize))
         .route("/token", any(compat_token))
+        .route("/register", any(compat_register))
         .with_state(state)
 }
 
@@ -255,10 +267,12 @@ async fn protected_resource_metadata(
     let resource = request_base_url(&request)
         .map(|base| format!("{base}/mcp"))
         .unwrap_or_else(|| "/mcp".to_string());
+    let authorization_server = request_base_url(&request)
+        .unwrap_or_else(|| state.oidc_metadata.issuer.clone());
 
     Ok(Json(ProtectedResourceMetadata {
         resource,
-        authorization_servers: vec![state.oidc_metadata.issuer.clone()],
+        authorization_servers: vec![authorization_server],
         bearer_methods_supported: vec!["header".to_string()],
         scopes_supported: state.required_scopes.clone(),
     }))
@@ -266,14 +280,16 @@ async fn protected_resource_metadata(
 
 async fn oauth_authorization_server_metadata(
     State(state): State<AppState>,
+    request: Request,
 ) -> Result<Json<AuthorizationServerMetadata>, GatewayError> {
-    Ok(Json(state.oidc_metadata.clone()))
+    Ok(Json(authorization_server_metadata(&state, &request)))
 }
 
 async fn openid_configuration(
     State(state): State<AppState>,
+    request: Request,
 ) -> Result<Json<AuthorizationServerMetadata>, GatewayError> {
-    Ok(Json(state.oidc_metadata.clone()))
+    Ok(Json(authorization_server_metadata(&state, &request)))
 }
 
 async fn compat_authorize(
@@ -321,6 +337,17 @@ async fn compat_token(
     build_proxy_response(upstream_response)
 }
 
+async fn compat_register(
+    State(state): State<AppState>,
+) -> Result<Json<ClientRegistrationResponse>, GatewayError> {
+    Ok(Json(ClientRegistrationResponse {
+        client_id: state.oidc_client_id.clone(),
+        token_endpoint_auth_method: "none".to_string(),
+        grant_types: vec!["authorization_code".to_string()],
+        response_types: vec!["code".to_string()],
+    }))
+}
+
 fn extract_bearer_token(headers: &HeaderMap) -> Option<&str> {
     let header = headers.get(axum::http::header::AUTHORIZATION)?;
     let value = header.to_str().ok()?;
@@ -355,6 +382,18 @@ fn request_base_url(request: &Request) -> Option<String> {
         .unwrap_or("http");
 
     Some(format!("{proto}://{host}"))
+}
+
+fn authorization_server_metadata(
+    state: &AppState,
+    request: &Request,
+) -> AuthorizationServerMetadata {
+    let mut metadata = state.oidc_metadata.clone();
+    if let Some(base) = request_base_url(request) {
+        metadata.issuer = base.clone();
+        metadata.registration_endpoint = Some(format!("{base}/register"));
+    }
+    metadata
 }
 
 fn filtered_request_headers(headers: &HeaderMap) -> Vec<(HeaderName, String)> {
@@ -417,11 +456,21 @@ struct AuthorizationServerMetadata {
     authorization_endpoint: String,
     token_endpoint: String,
     jwks_uri: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    registration_endpoint: Option<String>,
     response_types_supported: Vec<String>,
     grant_types_supported: Vec<String>,
     code_challenge_methods_supported: Vec<String>,
     scopes_supported: Vec<String>,
     token_endpoint_auth_methods_supported: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ClientRegistrationResponse {
+    client_id: String,
+    token_endpoint_auth_method: String,
+    grant_types: Vec<String>,
+    response_types: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
